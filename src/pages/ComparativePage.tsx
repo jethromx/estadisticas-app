@@ -925,6 +925,70 @@ function ComparativeSuggestions({
   const optOdd    = balMap['MELATE']?.optimalOddCount ?? 3
   const optEven   = balMap['MELATE']?.optimalEvenCount ?? 3
 
+  // Analysis rows for convergence table
+  const analysisRows = useMemo(() => {
+    function balanced6(ranked: number[]): number[] {
+      const odd  = ranked.filter(n => n % 2 !== 0)
+      const even = ranked.filter(n => n % 2 === 0)
+      return [...odd.slice(0, 3), ...even.slice(0, 3)].sort((a, b) => a - b)
+    }
+
+    const rows: { label: string; numbers: number[]; color: string }[] = []
+
+    // 1. Selección maestra
+    rows.push({ label: 'Selección Maestra', numbers: selectedNums, color: '#7c3aed' })
+
+    // 2. Consenso puro (due + trend)
+    rows.push({ label: 'Consenso', numbers: pickBalanced([...rankedScores]), color: '#6366f1' })
+
+    // 3. Bayesiano — top por posterior medio entre juegos
+    const bayesRanked = Array.from({ length: 56 }, (_, i) => i + 1)
+      .map(num => {
+        const entries = GAMES.map(g => bayesLookup[g][num]).filter(Boolean)
+        const avg = entries.length
+          ? entries.reduce((s, b) => s + b.posteriorMean, 0) / entries.length
+          : 0
+        return { num, avg }
+      })
+      .sort((a, b) => b.avg - a.avg)
+    rows.push({ label: 'Bayesiano', numbers: balanced6(bayesRanked.map(r => r.num)), color: '#0ea5e9' })
+
+    // 4-6. Backtest por juego
+    GAMES.forEach(g => {
+      const b = backtestMap[g]
+      if (b?.predictedNumbers?.length) {
+        rows.push({
+          label: `Backtest ${GAME_LABEL[g]}`,
+          numbers: [...b.predictedNumbers].sort((a, b) => a - b),
+          color: GAME_COLOR[g],
+        })
+      }
+    })
+
+    // 7. Co-ocurrencia — números más conectados en pares top-10
+    const pairFreq: Record<number, number> = {}
+    GAMES.forEach(g => {
+      pairsMap[g]?.slice(0, 10).forEach(p => {
+        pairFreq[p.number1] = (pairFreq[p.number1] ?? 0) + p.frequency
+        pairFreq[p.number2] = (pairFreq[p.number2] ?? 0) + p.frequency
+      })
+    })
+    const pairRanked = Object.entries(pairFreq)
+      .map(([n, freq]) => ({ num: Number(n), freq }))
+      .sort((a, b) => b.freq - a.freq)
+      .map(r => r.num)
+    rows.push({ label: 'Co-ocurrencia', numbers: balanced6(pairRanked), color: '#10b981' })
+
+    return rows
+  }, [selectedNums, rankedScores, bayesLookup, backtestMap, pairsMap])
+
+  // Count how many analyses suggest each number
+  const coincidenceMap = useMemo(() => {
+    const cm: Record<number, number> = {}
+    analysisRows.forEach(row => row.numbers.forEach(n => { cm[n] = (cm[n] ?? 0) + 1 }))
+    return cm
+  }, [analysisRows])
+
   return (
     <div className="flex flex-col gap-6">
 
@@ -1161,6 +1225,85 @@ function ComparativeSuggestions({
               )
             })}
           </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Convergence table ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Convergencia por Análisis</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Números sugeridos por cada método. Los que coinciden en más análisis aparecen
+            resaltados: <span className="font-semibold text-amber-600 dark:text-amber-400">dorado ≥ 5</span>{' '}·{' '}
+            <span className="font-semibold text-violet-600 dark:text-violet-400">violeta ≥ 3</span>{' '}·{' '}
+            <span className="font-semibold text-blue-600 dark:text-blue-400">azul ≥ 2</span>
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-2">
+            {analysisRows.map(row => (
+              <div key={row.label} className="flex items-start gap-3 py-1.5 border-b border-zinc-50 dark:border-zinc-800/60 last:border-0">
+                <span className="w-36 shrink-0 text-xs text-zinc-500 dark:text-zinc-400 pt-1 leading-tight">
+                  {row.label}
+                </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {row.numbers.map(n => {
+                    const count = coincidenceMap[n] ?? 0
+                    return (
+                      <span
+                        key={n}
+                        title={`${n} · aparece en ${count} análisis`}
+                        className={cn(
+                          'inline-flex h-8 w-8 items-center justify-center rounded-full font-bold text-xs text-white transition-all',
+                          count >= 5
+                            ? 'ring-2 ring-offset-1 ring-amber-400 dark:ring-offset-zinc-900'
+                            : count >= 3
+                            ? 'ring-2 ring-offset-1 ring-violet-400 dark:ring-offset-zinc-900'
+                            : count >= 2
+                            ? 'ring-2 ring-offset-1 ring-blue-400 dark:ring-offset-zinc-900'
+                            : '',
+                        )}
+                        style={{ background: row.color }}
+                      >
+                        {n}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Most coincident numbers summary */}
+          {(() => {
+            const top = Object.entries(coincidenceMap)
+              .filter(([, c]) => c >= 3)
+              .sort(([, a], [, b]) => b - a)
+              .map(([n, c]) => ({ n: Number(n), c }))
+            if (!top.length) return null
+            return (
+              <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
+                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-2">
+                  Números con mayor convergencia (≥ 3 análisis)
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {top.map(({ n, c }) => (
+                    <div key={n} className="flex flex-col items-center gap-0.5">
+                      <span className={cn(
+                        'inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm text-white',
+                        c >= 5 ? 'bg-amber-500' : c >= 4 ? 'bg-violet-600' : 'bg-blue-500',
+                      )}>
+                        {n}
+                      </span>
+                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tabular-nums">
+                        {c}/{analysisRows.length}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
         </CardContent>
       </Card>
 
