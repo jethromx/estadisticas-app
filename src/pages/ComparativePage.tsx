@@ -434,6 +434,202 @@ function BalanceComparison({ balances }: { balances: Record<string, BalanceAnaly
   )
 }
 
+// ── DueComparison ─────────────────────────────────────────────────────────────
+
+function DueComparison({ dueMap }: { dueMap: Record<string, DueNumber[]> }) {
+  const tops = useMemo(
+    () => Object.fromEntries(
+      GAMES.map(g => [
+        g,
+        [...(dueMap[g] ?? [])].sort((a, b) => b.dueScore - a.dueScore).slice(0, 10),
+      ]),
+    ),
+    [dueMap],
+  )
+
+  const heatData = useMemo(
+    () =>
+      Array.from({ length: 56 }, (_, i) => i + 1).map(num => {
+        const scores = GAMES.map(g => dueMap[g]?.find(d => d.number === num)?.dueScore ?? 0)
+        const avg = scores.reduce((a, b) => a + b, 0) / GAMES.length
+        return { num, avg, scores }
+      }),
+    [dueMap],
+  )
+
+  const maxAvg = Math.max(...heatData.map(d => d.avg), 0.01)
+
+  return (
+    <div className="flex flex-col gap-6">
+
+      {/* ── Heatmap grid ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Mapa de calor — Números más pendientes</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Intensidad = dueScore promedio entre los 3 juegos.
+            Los puntos de color muestran en qué juego el número tiene mayor deuda.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-8 sm:grid-cols-10 md:grid-cols-14 gap-1.5">
+            {heatData.map(({ num, avg, scores }) => {
+              const norm  = avg / maxAvg
+              const top6  = [...heatData].sort((a, b) => b.avg - a.avg).slice(0, 6).some(d => d.num === num)
+              return (
+                <div
+                  key={num}
+                  title={`Nº${num} · avg ${avg.toFixed(2)} · ${GAMES.map((g, i) => `${GAME_LABEL[g]}: ${scores[i].toFixed(2)}`).join(' · ')}`}
+                  className={cn(
+                    'flex flex-col items-center justify-center rounded-lg aspect-square cursor-default select-none transition-all gap-0.5',
+                    top6 && 'ring-2 ring-offset-1 ring-amber-400 dark:ring-offset-zinc-900',
+                    norm > 0.75 ? 'bg-red-500 text-white'
+                    : norm > 0.50 ? 'bg-orange-400 text-white'
+                    : norm > 0.25 ? 'bg-amber-300 text-amber-900'
+                    : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400',
+                  )}
+                >
+                  <span className="text-xs font-bold leading-none">{num}</span>
+                  <div className="flex gap-px">
+                    {GAMES.map((g, i) => (
+                      <span
+                        key={g}
+                        className="w-1 h-1 rounded-full"
+                        style={{ background: scores[i] >= 1.0 ? GAME_COLOR[g] : 'transparent' }}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+          <div className="flex items-center gap-4 flex-wrap text-xs text-zinc-500 dark:text-zinc-400 mt-3">
+            <span>Urgencia:</span>
+            <span className="flex items-center gap-1"><span className="w-4 h-4 rounded bg-red-500 inline-block" /> Muy alta</span>
+            <span className="flex items-center gap-1"><span className="w-4 h-4 rounded bg-orange-400 inline-block" /> Alta</span>
+            <span className="flex items-center gap-1"><span className="w-4 h-4 rounded bg-amber-300 inline-block" /> Media</span>
+            <span className="flex items-center gap-1"><span className="w-4 h-4 rounded bg-zinc-200 dark:bg-zinc-700 inline-block" /> Baja</span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Top 10 per game ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Top 10 por juego</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            dueScore = sorteos sin salir ÷ intervalo promedio histórico.
+            Score ≥ 1.0 indica que el número lleva más tiempo del habitual sin aparecer.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 sm:grid-cols-3">
+            {GAMES.map(g => (
+              <div key={g} className="flex flex-col gap-1">
+                <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+                  {GAME_ICON[g]} {GAME_LABEL[g]}
+                </p>
+                {tops[g].map((dn, rank) => {
+                  const pct   = Math.min((dn.dueScore / 2) * 100, 100)
+                  const hot   = dn.dueScore >= 1.5
+                  const warn  = dn.dueScore >= 1.0
+                  return (
+                    <div key={dn.number} className="flex items-center gap-2 py-1.5 border-b border-zinc-50 dark:border-zinc-800/60 last:border-0">
+                      <span className="w-4 text-right text-[10px] text-zinc-400 shrink-0">{rank + 1}</span>
+                      <span
+                        className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full font-bold text-sm text-white"
+                        style={{ background: GAME_COLOR[g] }}
+                      >
+                        {dn.number}
+                      </span>
+                      <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                        <div className="flex items-center justify-between gap-1">
+                          <span className="text-xs text-zinc-600 dark:text-zinc-400 tabular-nums">
+                            {dn.drawsSinceLast} sorteos
+                          </span>
+                          <span className={cn(
+                            'text-[10px] font-bold tabular-nums',
+                            hot ? 'text-red-500' : warn ? 'text-amber-500' : 'text-zinc-400',
+                          )}>
+                            {dn.dueScore.toFixed(2)}
+                          </span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                          <div
+                            className={cn('h-full rounded-full', hot ? 'bg-red-500' : warn ? 'bg-amber-400' : 'bg-violet-400')}
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Cross-game top numbers ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Números con mayor deuda en varios juegos</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Números que están entre el top-10 de pendientes en más de un juego simultáneamente.
+          </p>
+        </CardHeader>
+        <CardContent>
+          {(() => {
+            const top10Sets = Object.fromEntries(
+              GAMES.map(g => [g, new Set(tops[g].map(d => d.number))]),
+            )
+            const shared = Array.from({ length: 56 }, (_, i) => i + 1)
+              .map(num => ({ num, count: GAMES.filter(g => top10Sets[g].has(num)).length }))
+              .filter(d => d.count >= 2)
+              .sort((a, b) => b.count - a.count)
+
+            if (!shared.length) return (
+              <p className="text-sm text-zinc-400 dark:text-zinc-500">
+                Ningún número está en el top-10 de más de un juego simultáneamente.
+              </p>
+            )
+            return (
+              <div className="flex flex-wrap gap-3">
+                {shared.map(({ num, count }) => {
+                  const avgScore = GAMES.reduce((s, g) => s + (dueMap[g]?.find(d => d.number === num)?.dueScore ?? 0), 0) / GAMES.length
+                  return (
+                    <div key={num} className="flex flex-col items-center gap-1">
+                      <span className={cn(
+                        'inline-flex h-12 w-12 items-center justify-center rounded-full font-bold text-lg text-white',
+                        count === 3 ? 'bg-amber-500' : 'bg-violet-600',
+                      )}>
+                        {num}
+                      </span>
+                      <div className="flex gap-0.5">
+                        {GAMES.map(g => (
+                          <span
+                            key={g}
+                            className="w-2 h-2 rounded-full"
+                            style={{ background: top10Sets[g].has(num) ? GAME_COLOR[g] : '#e5e7eb' }}
+                          />
+                        ))}
+                      </div>
+                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400">
+                        {avgScore.toFixed(2)}
+                      </span>
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })()}
+        </CardContent>
+      </Card>
+
+    </div>
+  )
+}
+
 // ── PairsComparison ───────────────────────────────────────────────────────────
 
 function PairsComparison({
@@ -1654,6 +1850,7 @@ export function ComparativePage() {
       <Tabs defaultValue="consenso">
         <TabsList>
           <TabsTrigger value="consenso">Consenso</TabsTrigger>
+          <TabsTrigger value="due">Por salir</TabsTrigger>
           <TabsTrigger value="distribucion">Distribución</TabsTrigger>
           <TabsTrigger value="pares">Pares</TabsTrigger>
           <TabsTrigger value="bayesiano">Bayesiano</TabsTrigger>
@@ -1712,6 +1909,11 @@ export function ComparativePage() {
             </Card>
 
           </div>
+        </TabsContent>
+
+        {/* ── Tab: Por salir ── */}
+        <TabsContent value="due">
+          <DueComparison dueMap={dueMap} />
         </TabsContent>
 
         {/* ── Tab: Distribución ── */}
