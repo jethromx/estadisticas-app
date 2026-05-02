@@ -343,7 +343,7 @@ function SumOverlayChart({
           <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
           <XAxis dataKey="sum" tick={{ fontSize: 9 }} interval={Math.ceil(chartData.length / 20) - 1} />
           <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${v}%`} />
-          <Tooltip formatter={(v: unknown, name: string) => [`${Number(v).toFixed(2)}%`, GAME_LABEL[name] ?? name]} labelFormatter={l => `Suma ${l}`} />
+          <Tooltip formatter={(v: unknown, name: unknown) => [`${Number(v).toFixed(2)}%`, GAME_LABEL[String(name)] ?? String(name)]} labelFormatter={l => `Suma ${l}`} />
           <Legend formatter={name => GAME_LABEL[name] ?? name} />
           {sharedMin && <ReferenceLine x={sharedMin} stroke="#7c3aed" strokeDasharray="4 2" opacity={0.6} />}
           {sharedMax && <ReferenceLine x={sharedMax} stroke="#7c3aed" strokeDasharray="4 2" opacity={0.6} />}
