@@ -7,7 +7,7 @@ import type {
   Methodology,
 } from '@/types/lottery'
 
-const BASE = '/api/v1/lottery'
+const BASE = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/lottery`
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, options)
