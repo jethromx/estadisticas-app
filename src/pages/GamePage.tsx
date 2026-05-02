@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner, PageSpinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import type { LotteryTypeId, NumberFrequency, PatternSuggestion, DueNumber, WindowedFrequency, BalanceAnalysis, SumDistribution, NumberPair, ChiSquareResult, BacktestResult, BayesianNumber } from '@/types/lottery'
+import type { LotteryTypeId, NumberFrequency, PatternSuggestion, DueNumber, WindowedFrequency, BalanceAnalysis, SumDistribution, NumberPair, ChiSquareResult, BayesianNumber } from '@/types/lottery'
 
 const METHODOLOGY_LABELS: Record<string, string> = {
   HOT_NUMBERS:        'Números Calientes',
