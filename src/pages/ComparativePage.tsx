@@ -1444,6 +1444,7 @@ function ComparativeSuggestions({
                 </div>
               )
             })}
+          </div>
         </CardContent>
       </Card>
 
