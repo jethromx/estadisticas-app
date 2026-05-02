@@ -836,6 +836,400 @@ function ChiSquareComparison({
   )
 }
 
+// ── ComparativeSuggestions ────────────────────────────────────────────────────
+
+function ComparativeSuggestions({
+  rankedScores,
+  bayesMap,
+  balMap,
+  sumMap,
+  chiMap,
+  backtestMap,
+  pairsMap,
+}: {
+  rankedScores: NumberScore[]
+  bayesMap:     Record<string, BayesianNumber[] | undefined>
+  balMap:       Record<string, BalanceAnalysis | undefined>
+  sumMap:       Record<string, SumDistribution | undefined>
+  chiMap:       Record<string, ChiSquareResult | undefined>
+  backtestMap:  Record<string, BacktestResult | undefined>
+  pairsMap:     Record<string, NumberPair[] | undefined>
+}) {
+  const bayesLookup = useMemo(() => {
+    const lk: Record<string, Record<number, BayesianNumber>> = {}
+    GAMES.forEach(g => {
+      lk[g] = {}
+      bayesMap[g]?.forEach(b => { lk[g][b.number] = b })
+    })
+    return lk
+  }, [bayesMap])
+
+  const pairCountMap = useMemo(() => {
+    const cm: Record<number, number> = {}
+    GAMES.forEach(g => {
+      const nums = new Set<number>()
+      pairsMap[g]?.slice(0, 5).forEach(p => { nums.add(p.number1); nums.add(p.number2) })
+      nums.forEach(n => { cm[n] = (cm[n] ?? 0) + 1 })
+    })
+    return cm
+  }, [pairsMap])
+
+  const rankedEnhanced = useMemo(() => {
+    const maxLift = Math.max(
+      ...GAMES.flatMap(g => bayesMap[g]?.map(b => b.lift) ?? []).filter(l => l > 0),
+      0.01,
+    )
+    return [...rankedScores]
+      .map(s => {
+        const bayesScores = GAMES.map(g => {
+          const b = bayesLookup[g][s.number]
+          return b ? Math.max(b.lift, 0) / maxLift : 0
+        })
+        const avgBayes    = bayesScores.reduce((a, x) => a + x, 0) / GAMES.length
+        const consistency = s.gamesInTop10 / 3
+        const pairScore   = (pairCountMap[s.number] ?? 0) / 3
+        const enhanced    = s.consensusScore * 0.40 + avgBayes * 0.30 + consistency * 0.15 + pairScore * 0.15
+        return { ...s, enhancedScore: enhanced, avgBayes }
+      })
+      .sort((a, b) => b.enhancedScore - a.enhancedScore)
+  }, [rankedScores, bayesLookup, pairCountMap, bayesMap])
+
+  const selectedNums = useMemo(() => pickBalanced(rankedEnhanced), [rankedEnhanced])
+
+  const byEnhanced = useMemo(
+    () => Object.fromEntries(rankedEnhanced.map(s => [s.number, s])),
+    [rankedEnhanced],
+  )
+
+  const { total, inRange, sharedMin, sharedMax } = useMemo(() => {
+    const t   = selectedNums.reduce((a, b) => a + b, 0)
+    const opt = GAMES.map(g => sumMap[g]).filter(Boolean) as SumDistribution[]
+    const mn  = opt.length ? Math.max(...opt.map(d => d.optimalMin)) : 0
+    const mx  = opt.length ? Math.min(...opt.map(d => d.optimalMax)) : 999
+    return { total: t, inRange: t >= mn && t <= mx, sharedMin: mn, sharedMax: mx }
+  }, [selectedNums, sumMap])
+
+  const avgBacktestLift = useMemo(() => {
+    const games = GAMES.filter(g => backtestMap[g] !== undefined)
+    if (!games.length) return 0
+    return games.reduce((s, g) => {
+      const b = backtestMap[g]!
+      return s + (b.hitRate - b.expectedRandomRate)
+    }, 0) / games.length
+  }, [backtestMap])
+
+  const allUniform = GAMES.every(g => (chiMap[g]?.pValue ?? 0) > 0.05)
+
+  const oddCount  = selectedNums.filter(n => n % 2 !== 0).length
+  const evenCount = selectedNums.length - oddCount
+  const optOdd    = balMap['MELATE']?.optimalOddCount ?? 3
+  const optEven   = balMap['MELATE']?.optimalEvenCount ?? 3
+
+  return (
+    <div className="flex flex-col gap-6">
+
+      {/* ── Master selection ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Selección Maestra Multi-Juego</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Fórmula integrada: consenso 40% · bayesiano 30% · consistencia entre juegos 15% · red de pares 15%
+            — con restricción de balance {optOdd}I/{optEven}P
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-5">
+
+            {/* Number balls */}
+            <div className="flex flex-wrap gap-4 justify-center sm:justify-start">
+              {selectedNums.map(n => {
+                const s        = byEnhanced[n]
+                const gamesTop = s?.gamesInTop10 ?? 0
+                const bayesPos = GAMES.filter(g => (bayesLookup[g][n]?.lift ?? -1) > 0).length
+                return (
+                  <div key={n} className="flex flex-col items-center gap-1.5">
+                    <span className={cn(
+                      'inline-flex h-14 w-14 items-center justify-center rounded-full font-bold text-xl text-white shadow-sm',
+                      gamesTop === 3 ? 'bg-amber-500' : gamesTop === 2 ? 'bg-violet-600' : 'bg-violet-400',
+                    )}>
+                      {n}
+                    </span>
+                    <div className="flex gap-0.5">
+                      {GAMES.map(g => (
+                        <span
+                          key={g}
+                          title={`${GAME_LABEL[g]}: due=${s?.details.find(d => d.game === g)?.dueScore.toFixed(2)}`}
+                          className="w-2 h-2 rounded-full"
+                          style={{
+                            background: (s?.details.find(d => d.game === g)?.dueScore ?? 0) > 0.3
+                              ? GAME_COLOR[g] : '#d1d5db',
+                          }}
+                        />
+                      ))}
+                    </div>
+                    {bayesPos > 0 && (
+                      <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                        +{bayesPos}↑
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Suma</p>
+                <p className={cn('text-lg font-bold', inRange ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
+                  {total}
+                </p>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  {inRange ? `✓ ${sharedMin}–${sharedMax}` : `fuera de ${sharedMin}–${sharedMax}`}
+                </p>
+              </div>
+              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Balance</p>
+                <p className="text-lg font-bold text-zinc-800 dark:text-zinc-100">{oddCount}I · {evenCount}P</p>
+                <p className="text-xs text-zinc-400 mt-0.5">impar · par</p>
+              </div>
+              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Consenso ≥2 juegos</p>
+                <p className="text-lg font-bold text-violet-700 dark:text-violet-300">
+                  {selectedNums.filter(n => (byEnhanced[n]?.gamesInTop10 ?? 0) >= 2).length}/6
+                </p>
+              </div>
+              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3">
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Lift bayesiano +</p>
+                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                  {selectedNums.filter(n => GAMES.some(g => (bayesLookup[g][n]?.lift ?? -1) > 0)).length}/6
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Confidence context ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Contexto de Confianza</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2">
+
+            <div className={cn(
+              'rounded-lg border p-4',
+              avgBacktestLift > 0
+                ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-900/20'
+                : 'border-amber-200  dark:border-amber-800  bg-amber-50  dark:bg-amber-900/20',
+            )}>
+              <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-2">
+                Rendimiento histórico (Backtest)
+              </p>
+              {GAMES.map(g => {
+                const b = backtestMap[g]
+                if (!b) return null
+                const beats = b.hitRate > b.expectedRandomRate
+                return (
+                  <p key={g} className="text-xs flex justify-between py-0.5">
+                    <span className="text-zinc-500 dark:text-zinc-400">{GAME_ICON[g]} {GAME_LABEL[g]}</span>
+                    <span className={cn('font-semibold tabular-nums', beats ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400')}>
+                      {(b.hitRate * 100).toFixed(1)}% vs {(b.expectedRandomRate * 100).toFixed(1)}%
+                    </span>
+                  </p>
+                )
+              })}
+              <p className={cn('text-xs font-bold mt-2', avgBacktestLift > 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-amber-700 dark:text-amber-300')}>
+                {avgBacktestLift > 0
+                  ? `✓ Supera al azar en ${(avgBacktestLift * 100).toFixed(1)}pp promedio`
+                  : `⚠ No supera consistentemente al azar`}
+              </p>
+            </div>
+
+            <div className={cn(
+              'rounded-lg border p-4',
+              allUniform
+                ? 'border-blue-200   dark:border-blue-800   bg-blue-50   dark:bg-blue-900/20'
+                : 'border-violet-200 dark:border-violet-800 bg-violet-50 dark:bg-violet-900/20',
+            )}>
+              <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-2">
+                Uniformidad estadística (Chi²)
+              </p>
+              {GAMES.map(g => {
+                const c = chiMap[g]
+                if (!c) return null
+                const uniform = c.pValue > 0.05
+                return (
+                  <p key={g} className="text-xs flex justify-between items-center py-0.5">
+                    <span className="text-zinc-500 dark:text-zinc-400">{GAME_ICON[g]} {GAME_LABEL[g]}</span>
+                    <Badge
+                      variant="secondary"
+                      className={cn(
+                        'text-[10px] h-5',
+                        uniform
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-300'
+                          : 'bg-amber-100   text-amber-800   dark:bg-amber-900/40   dark:text-amber-300',
+                      )}
+                    >
+                      {uniform ? 'Uniforme' : 'No uniforme'} · p={c.pValue < 0.0001 ? '<0.0001' : c.pValue.toFixed(3)}
+                    </Badge>
+                  </p>
+                )
+              })}
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-2">
+                {allUniform
+                  ? 'Los 3 juegos son estadísticamente uniformes: los sesgos son pequeños.'
+                  : 'Al menos un juego muestra sesgos estadísticos: algunos números tienen frecuencia anómala.'}
+              </p>
+            </div>
+
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Per-number signal breakdown ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Señales por Número Seleccionado</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Detalle de señales activas en los 3 juegos para cada número elegido
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3">
+            {selectedNums.map(n => {
+              const s = byEnhanced[n]
+              return (
+                <div key={n} className="rounded-lg border border-zinc-100 dark:border-zinc-800 p-3">
+                  <div className="flex items-center gap-3 mb-2">
+                    <span className={cn(
+                      'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-bold text-white text-sm',
+                      (s?.gamesInTop10 ?? 0) === 3 ? 'bg-amber-500'
+                      : (s?.gamesInTop10 ?? 0) === 2 ? 'bg-violet-600'
+                      : 'bg-violet-400',
+                    )}>
+                      {n}
+                    </span>
+                    <div className="flex flex-1 flex-wrap gap-1.5">
+                      {(s?.gamesInTop10 ?? 0) >= 2 && (
+                        <Badge variant="secondary" className="bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 text-[10px]">
+                          Top-10 en {s!.gamesInTop10} juegos
+                        </Badge>
+                      )}
+                      {(pairCountMap[n] ?? 0) > 0 && (
+                        <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-300 text-[10px]">
+                          Pares frecuentes ×{pairCountMap[n]}
+                        </Badge>
+                      )}
+                    </div>
+                    <span className="text-xs text-zinc-400 shrink-0 tabular-nums">
+                      {s?.enhancedScore.toFixed(3)}
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {GAMES.map(g => {
+                      const d   = s?.details.find(dd => dd.game === g)
+                      const bay = bayesLookup[g][n]
+                      return (
+                        <div key={g} className="text-xs rounded-md bg-zinc-50 dark:bg-zinc-800/50 px-2 py-1.5">
+                          <p className="font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
+                            {GAME_ICON[g]} {GAME_LABEL[g]}
+                          </p>
+                          <p className="text-zinc-500">
+                            Due: <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                              {d ? d.dueScore.toFixed(2) : '–'}
+                            </span>
+                          </p>
+                          <p className={cn((d?.trend ?? 0) > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500')}>
+                            Trend: <span className="font-medium">
+                              {d ? `${d.trend > 0 ? '▲' : '▼'}${Math.abs(d.trend).toFixed(1)}%` : '–'}
+                            </span>
+                          </p>
+                          {bay && (
+                            <p className={cn(bay.lift > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-400')}>
+                              Lift: <span className="font-medium">
+                                {bay.lift > 0 ? '+' : ''}{bay.lift.toFixed(2)}
+                              </span>
+                            </p>
+                          )}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Top-10 enhanced ranking ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Top 10 — Ranking Integrado</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Los 10 candidatos más fuertes según la fórmula combinada.
+            Los resaltados forman la selección final.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-1.5">
+            {rankedEnhanced.slice(0, 10).map((s, rank) => {
+              const isSelected = selectedNums.includes(s.number)
+              return (
+                <div
+                  key={s.number}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2',
+                    isSelected
+                      ? 'bg-violet-50 dark:bg-violet-900/20 ring-1 ring-violet-200 dark:ring-violet-800'
+                      : 'bg-zinc-50 dark:bg-zinc-800/30',
+                  )}
+                >
+                  <span className="text-xs text-zinc-400 w-4 shrink-0">{rank + 1}</span>
+                  <span className={cn(
+                    'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full font-bold text-xs text-white',
+                    isSelected ? 'bg-violet-600' : 'bg-zinc-400 dark:bg-zinc-600',
+                  )}>
+                    {s.number}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <div className="h-2 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                      <div
+                        className={cn('h-2 rounded-full', isSelected ? 'bg-violet-500' : 'bg-zinc-300 dark:bg-zinc-600')}
+                        style={{ width: `${(s.enhancedScore / (rankedEnhanced[0]?.enhancedScore ?? 1)) * 100}%` }}
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-0.5 shrink-0">
+                    {GAMES.map(g => (
+                      <span
+                        key={g}
+                        className="w-1.5 h-5 rounded-sm"
+                        style={{
+                          background: (s.details.find(d => d.game === g)?.dueScore ?? 0) > 0.3
+                            ? GAME_COLOR[g] : '#e5e7eb',
+                        }}
+                      />
+                    ))}
+                  </div>
+                  {isSelected && (
+                    <Badge variant="secondary" className="bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300 text-[10px] shrink-0">
+                      ✓
+                    </Badge>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function ComparativePage() {
@@ -981,6 +1375,7 @@ export function ComparativePage() {
           <TabsTrigger value="bayesiano">Bayesiano</TabsTrigger>
           <TabsTrigger value="backtest">Backtest</TabsTrigger>
           <TabsTrigger value="chisq">Chi²</TabsTrigger>
+          <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
         </TabsList>
 
         {/* ── Tab: Consenso ── */}
@@ -1133,6 +1528,19 @@ export function ComparativePage() {
               <ChiSquareComparison chiMap={chiMap} />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ── Tab: Sugerencias ── */}
+        <TabsContent value="sugerencias">
+          <ComparativeSuggestions
+            rankedScores={rankedScores}
+            bayesMap={bayesMap}
+            balMap={balMap}
+            sumMap={sumMap}
+            chiMap={chiMap}
+            backtestMap={backtestMap}
+            pairsMap={pairsMap}
+          />
         </TabsContent>
 
       </Tabs>
