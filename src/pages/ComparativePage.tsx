@@ -1134,7 +1134,17 @@ function ComparativeSuggestions({
     // 1. Selección maestra
     rows.push({ label: 'Selección Maestra', numbers: selectedNums, color: '#7c3aed' })
 
-    // 2. Consenso puro (due + trend)
+    // 2. Por salir — top por dueScore acumulado entre los 3 juegos
+    const dueRanked = [...rankedScores]
+      .map(s => ({
+        num:      s.number,
+        totalDue: s.details.reduce((acc, d) => acc + d.dueScore, 0),
+      }))
+      .sort((a, b) => b.totalDue - a.totalDue)
+      .map(r => r.num)
+    rows.push({ label: 'Por salir', numbers: balanced6(dueRanked), color: '#ef4444' })
+
+    // 3. Consenso puro (due + trend)
     rows.push({ label: 'Consenso', numbers: pickBalanced([...rankedScores]), color: '#6366f1' })
 
     // 3. Bayesiano — top por posterior medio entre juegos
