@@ -1347,6 +1347,54 @@ function ComparativeSuggestions({
     ]
   }, [coincidenceMap, bayesMap, rankedScores, bayesLookup, sumMap, pairsMap, analysisRows, backtestMap])
 
+  // Combinations derived from numbers repeated across the 5 conclusionCombos
+  const derivedCombos = useMemo(() => {
+    const hits: Record<number, number> = {}
+    conclusionCombos.forEach(c => c.numbers.forEach(n => { hits[n] = (hits[n] ?? 0) + 1 }))
+
+    // Pool: numbers appearing in 2+ combos, sorted by hit count then value
+    const pool = Array.from({ length: 56 }, (_, i) => i + 1)
+      .filter(n => (hits[n] ?? 0) >= 2)
+      .sort((a, b) => (hits[b] ?? 0) - (hits[a] ?? 0))
+
+    if (pool.length < 6) return []
+
+    function pickBalance(ranked: number[], nOdd: number, nEven: number): number[] {
+      const odd  = ranked.filter(n => n % 2 !== 0)
+      const even = ranked.filter(n => n % 2 === 0)
+      return [...odd.slice(0, nOdd), ...even.slice(0, nEven)].sort((a, b) => a - b)
+    }
+
+    const maxHit = Math.max(...pool.map(n => hits[n] ?? 0), 1)
+
+    return [
+      {
+        title:   'Repetidos · 3I + 3P',
+        desc:    'Números que coinciden en ≥2 combinaciones — balance estándar',
+        numbers: pickBalance(pool, 3, 3),
+        color:   '#dc2626',
+        hits,
+        maxHit,
+      },
+      {
+        title:   'Repetidos · 4I + 2P',
+        desc:    'Mismos candidatos repetidos priorizando impares',
+        numbers: pickBalance(pool, 4, 2),
+        color:   '#d97706',
+        hits,
+        maxHit,
+      },
+      {
+        title:   'Repetidos · 2I + 4P',
+        desc:    'Mismos candidatos repetidos priorizando pares',
+        numbers: pickBalance(pool, 2, 4),
+        color:   '#7c3aed',
+        hits,
+        maxHit,
+      },
+    ]
+  }, [conclusionCombos])
+
   return (
     <div className="flex flex-col gap-6">
 
@@ -1699,6 +1747,110 @@ function ComparativeSuggestions({
               )
             })}
           </div>
+
+          {/* Derived combos from repeated numbers */}
+          {derivedCombos.length > 0 && (
+            <div className="mt-6 flex flex-col gap-3">
+              <div className="flex items-center gap-2">
+                <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-700" />
+                <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 shrink-0 px-2">
+                  Derivadas de números repetidos entre las 5 combinaciones
+                </p>
+                <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-700" />
+              </div>
+
+              {/* Pool summary */}
+              {(() => {
+                const hits: Record<number, number> = {}
+                conclusionCombos.forEach(c => c.numbers.forEach(n => { hits[n] = (hits[n] ?? 0) + 1 }))
+                const pool = Array.from({ length: 56 }, (_, i) => i + 1)
+                  .filter(n => (hits[n] ?? 0) >= 2)
+                  .sort((a, b) => (hits[b] ?? 0) - (hits[a] ?? 0))
+                return (
+                  <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/50 p-3">
+                    <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+                      Pool de <b className="text-zinc-700 dark:text-zinc-200">{pool.length} números</b> que
+                      aparecen en 2 o más de las 5 combinaciones anteriores:
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {pool.map(n => (
+                        <div key={n} className="flex flex-col items-center gap-0.5">
+                          <span
+                            className={cn(
+                              'inline-flex h-8 w-8 items-center justify-center rounded-full font-bold text-xs text-white',
+                              (hits[n] ?? 0) >= 4 ? 'bg-amber-500'
+                              : (hits[n] ?? 0) === 3 ? 'bg-violet-600'
+                              : 'bg-zinc-400 dark:bg-zinc-600',
+                            )}
+                          >
+                            {n}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 tabular-nums">
+                            {hits[n]}/5
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })()}
+
+              {derivedCombos.map(combo => {
+                const sum   = combo.numbers.reduce((a, b) => a + b, 0)
+                const opt   = GAMES.map(g => sumMap[g]).filter(Boolean) as SumDistribution[]
+                const sMin  = opt.length ? Math.max(...opt.map(d => d.optimalMin)) : 0
+                const sMax  = opt.length ? Math.min(...opt.map(d => d.optimalMax)) : 999
+                const inR   = sum >= sMin && sum <= sMax
+                const oddC  = combo.numbers.filter(n => n % 2 !== 0).length
+                const evenC = combo.numbers.length - oddC
+
+                return (
+                  <div
+                    key={combo.title}
+                    className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 flex flex-col gap-2.5"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                          {combo.title}
+                        </p>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">{combo.desc}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={cn('text-sm font-bold tabular-nums', inR ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
+                          Σ {sum}
+                        </p>
+                        <p className="text-[10px] text-zinc-400">{oddC}I · {evenC}P</p>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {combo.numbers.map(n => (
+                        <div key={n} className="flex flex-col items-center gap-0.5">
+                          <span
+                            title={`${n} · aparece en ${combo.hits[n] ?? 0}/5 combinaciones`}
+                            className={cn(
+                              'inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm text-white',
+                              (combo.hits[n] ?? 0) >= 4
+                                ? 'ring-2 ring-offset-1 ring-amber-400 dark:ring-offset-zinc-900'
+                                : (combo.hits[n] ?? 0) === 3
+                                ? 'ring-2 ring-offset-1 ring-violet-400 dark:ring-offset-zinc-900'
+                                : 'ring-2 ring-offset-1 ring-blue-300 dark:ring-offset-zinc-900',
+                            )}
+                            style={{ background: combo.color }}
+                          >
+                            {n}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 tabular-nums">
+                            {combo.hits[n] ?? 0}/5
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </CardContent>
       </Card>
 
