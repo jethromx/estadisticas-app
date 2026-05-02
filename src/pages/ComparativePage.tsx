@@ -1274,30 +1274,78 @@ function ComparativeSuggestions({
       .map(r => r.num)
     const combo3 = balanced6(duePairsRanked, sumOpt)
 
+    // Combo 4 — Por salir · Consistencia multi-juego
+    const maxTotalDue = Math.max(
+      ...rankedScores.map(s => s.details.reduce((acc, d) => acc + d.dueScore, 0)),
+      0.01,
+    )
+    const dueConsistencyRanked = rankedScores
+      .map(s => ({
+        num: s.number,
+        score: (s.details.reduce((acc, d) => acc + d.dueScore, 0) / maxTotalDue) * 0.55 +
+               (s.gamesInTop10 / 3) * 0.45,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .map(r => r.num)
+    const combo4 = balanced6(dueConsistencyRanked, sumOpt)
+
+    // Combo 5 — Backtest + Posterior: números predichos por backtest con mayor respaldo bayesiano
+    const backtestCount: Record<number, number> = {}
+    GAMES.forEach(g => {
+      backtestMap[g]?.predictedNumbers?.forEach(n => {
+        backtestCount[n] = (backtestCount[n] ?? 0) + 1
+      })
+    })
+    const maxPost = Math.max(
+      ...GAMES.flatMap(g => bayesMap[g]?.map(b => b.posteriorMean) ?? []),
+      0.01,
+    )
+    const backtestBayesRanked = Array.from({ length: 56 }, (_, i) => i + 1)
+      .map(num => {
+        const btScore   = (backtestCount[num] ?? 0) / 3
+        const avgPost   = GAMES.reduce((s, g) => {
+          const b = bayesLookup[g][num]
+          return s + (b ? b.posteriorMean / maxPost : 0)
+        }, 0) / GAMES.length
+        return { num, score: btScore * 0.55 + avgPost * 0.45 }
+      })
+      .sort((a, b) => b.score - a.score)
+      .map(r => r.num)
+    const combo5 = balanced6(backtestBayesRanked, sumOpt)
+
     return [
       {
         title: 'Convergencia Máxima',
         desc:  'Números respaldados por el mayor número de análisis',
         numbers: combo1,
         color: '#f59e0b',
-        badge: 'amber',
       },
       {
         title: 'Momentum Reciente',
-        desc:  'Números con mayor lift bayesiano y tendencia positiva',
+        desc:  'Lift bayesiano 60% + tendencia positiva 40%',
         numbers: combo2,
         color: '#0ea5e9',
-        badge: 'sky',
       },
       {
         title: 'Deuda Histórica + Pares',
-        desc:  'Números más retrasados con fuerte red de co-ocurrencia',
+        desc:  'Due score 65% + red de co-ocurrencia 35%',
         numbers: combo3,
         color: '#7c3aed',
-        badge: 'violet',
+      },
+      {
+        title: 'Por salir · Consistencia',
+        desc:  'Due acumulado 55% + presencia en top-10 de los 3 juegos 45%',
+        numbers: combo4,
+        color: '#ef4444',
+      },
+      {
+        title: 'Backtest + Posterior',
+        desc:  'Predichos por backtest en varios juegos 55% + posterior bayesiano 45%',
+        numbers: combo5,
+        color: '#10b981',
       },
     ]
-  }, [coincidenceMap, bayesMap, rankedScores, bayesLookup, sumMap, pairsMap, analysisRows])
+  }, [coincidenceMap, bayesMap, rankedScores, bayesLookup, sumMap, pairsMap, analysisRows, backtestMap])
 
   return (
     <div className="flex flex-col gap-6">
