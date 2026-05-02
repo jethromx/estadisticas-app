@@ -33,7 +33,8 @@ export function TabsList({ className, children }: { className?: string; children
   return (
     <div
       className={cn(
-        'inline-flex items-center gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800',
+        'flex items-center gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-zinc-800',
+        'overflow-x-auto scrollbar-none',
         className,
       )}
     >
@@ -55,7 +56,7 @@ export function TabsTrigger({ value, className, children }: TabsTriggerProps) {
     <button
       onClick={() => setActive(value)}
       className={cn(
-        'inline-flex items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+        'inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
         isActive
           ? 'bg-white text-zinc-900 shadow-sm dark:bg-zinc-900 dark:text-zinc-100'
           : 'text-zinc-600 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100',

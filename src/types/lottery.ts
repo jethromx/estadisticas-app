@@ -44,6 +44,15 @@ export interface PatternSuggestion {
   confidenceScore: number
 }
 
+export interface DueNumber {
+  number:         number
+  frequency:      number
+  lastDrawNumber: number
+  drawsSinceLast: number
+  avgInterval:    number
+  dueScore:       number
+}
+
 export interface SyncResult {
   lotteryType: LotteryTypeId
   totalRecords: number

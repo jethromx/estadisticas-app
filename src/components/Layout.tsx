@@ -65,10 +65,46 @@ export function Layout() {
             Lotería MX
           </span>
         </header>
-        <div className="flex-1 p-4 md:p-6">
+        <div className="flex-1 p-4 pb-24 md:p-6 lg:pb-6">
           <Outlet />
         </div>
       </main>
+
+      {/* Mobile bottom nav */}
+      <nav className="fixed bottom-0 inset-x-0 z-50 flex items-stretch border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
+        <NavLink
+          to="/"
+          end
+          className={({ isActive }) =>
+            cn(
+              'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium transition-colors',
+              isActive
+                ? 'text-violet-700 dark:text-violet-300'
+                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100',
+            )
+          }
+        >
+          <span className="text-base">📊</span>
+          <span>Dashboard</span>
+        </NavLink>
+        {LOTTERY_TYPES.map(meta => (
+          <NavLink
+            key={meta.id}
+            to={`/game/${meta.id}`}
+            className={({ isActive }) =>
+              cn(
+                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium transition-colors',
+                isActive
+                  ? 'text-violet-700 dark:text-violet-300'
+                  : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100',
+              )
+            }
+          >
+            <span className="text-base">{meta.icon}</span>
+            <span className="hidden xs:inline">{meta.label}</span>
+          </NavLink>
+        ))}
+      </nav>
     </div>
   )
 }

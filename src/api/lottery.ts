@@ -4,6 +4,7 @@ import type {
   NumberFrequency,
   PatternSuggestion,
   SyncResult,
+  DueNumber,
   Methodology,
 } from '@/types/lottery'
 
@@ -47,4 +48,7 @@ export const api = {
 
   suggestion: (type: LotteryTypeId, methodology: Methodology) =>
     request<PatternSuggestion>(`/${type}/suggestions/${methodology}`),
+
+  dueNumbers: (type: LotteryTypeId, limit = 10) =>
+    request<DueNumber[]>(`/${type}/due-numbers?limit=${limit}`),
 }

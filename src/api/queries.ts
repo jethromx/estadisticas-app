@@ -9,6 +9,7 @@ export const keys = {
   coldNumbers: (type: LotteryTypeId, limit: number)               => ['coldNumbers', type, limit] as const,
   recentHot:   (type: LotteryTypeId, draws: number, limit: number) => ['recentHot', type, draws, limit] as const,
   suggestions: (type: LotteryTypeId)                              => ['suggestions', type] as const,
+  dueNumbers:  (type: LotteryTypeId, limit: number)               => ['dueNumbers', type, limit] as const,
 }
 
 export function useStatistics(type: LotteryTypeId, from?: string, to?: string) {
@@ -55,6 +56,14 @@ export function useSuggestions(type: LotteryTypeId) {
   return useQuery({
     queryKey: keys.suggestions(type),
     queryFn:  () => api.suggestions(type),
+    enabled:  !!type,
+  })
+}
+
+export function useDueNumbers(type: LotteryTypeId, limit = 10) {
+  return useQuery({
+    queryKey: keys.dueNumbers(type, limit),
+    queryFn:  () => api.dueNumbers(type, limit),
     enabled:  !!type,
   })
 }
