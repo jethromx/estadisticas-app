@@ -47,6 +47,20 @@ export function Layout() {
             <span className="text-lg">📊</span>
             <span>Dashboard</span>
           </NavLink>
+          <NavLink
+            to="/comparative"
+            className={({ isActive }) =>
+              cn(
+                'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                isActive
+                  ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
+                  : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
+              )
+            }
+          >
+            <span className="text-lg">🔍</span>
+            <span>Comparativo</span>
+          </NavLink>
           <div className="my-2 h-px bg-zinc-100 dark:bg-zinc-800" />
           <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
             Juegos
@@ -86,6 +100,20 @@ export function Layout() {
         >
           <span className="text-base">📊</span>
           <span>Dashboard</span>
+        </NavLink>
+        <NavLink
+          to="/comparative"
+          className={({ isActive }) =>
+            cn(
+              'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium transition-colors',
+              isActive
+                ? 'text-violet-700 dark:text-violet-300'
+                : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100',
+            )
+          }
+        >
+          <span className="text-base">🔍</span>
+          <span>Comp.</span>
         </NavLink>
         {LOTTERY_TYPES.map(meta => (
           <NavLink

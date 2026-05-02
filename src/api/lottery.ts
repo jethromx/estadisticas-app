@@ -6,6 +6,13 @@ import type {
   SyncResult,
   DueNumber,
   Methodology,
+  WindowedFrequency,
+  BalanceAnalysis,
+  SumDistribution,
+  NumberPair,
+  ChiSquareResult,
+  BacktestResult,
+  BayesianNumber,
 } from '@/types/lottery'
 
 const BASE = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/lottery`
@@ -51,4 +58,27 @@ export const api = {
 
   dueNumbers: (type: LotteryTypeId, limit = 10) =>
     request<DueNumber[]>(`/${type}/due-numbers?limit=${limit}`),
+
+  windowedFrequencies: (type: LotteryTypeId, window = 100) =>
+    request<WindowedFrequency[]>(`/${type}/windowed-frequencies?window=${window}`),
+
+  balanceAnalysis: (type: LotteryTypeId) =>
+    request<BalanceAnalysis>(`/${type}/balance-analysis`),
+
+  sumDistribution: (type: LotteryTypeId) =>
+    request<SumDistribution>(`/${type}/sum-distribution`),
+
+  pairAnalysis: (type: LotteryTypeId, limit = 20) =>
+    request<NumberPair[]>(`/${type}/pair-analysis?limit=${limit}`),
+
+  chiSquare: (type: LotteryTypeId) =>
+    request<ChiSquareResult>(`/${type}/chi-square`),
+
+  backtest: (type: LotteryTypeId, topK?: number, testDraws = 100) =>
+    request<BacktestResult>(
+      `/${type}/backtest?testDraws=${testDraws}${topK != null ? `&topK=${topK}` : ''}`,
+    ),
+
+  bayesianAnalysis: (type: LotteryTypeId, recentWindow = 50) =>
+    request<BayesianNumber[]>(`/${type}/bayesian-analysis?recentWindow=${recentWindow}`),
 }

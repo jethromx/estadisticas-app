@@ -53,6 +53,83 @@ export interface DueNumber {
   dueScore:       number
 }
 
+export interface WindowedFrequency {
+  number: number
+  frequency: number
+  percentage: number
+  windowSize: number
+  windowDrawCount: number
+  /** Positive = appearing more than historical average; negative = less. Percentage points. */
+  trend: number
+}
+
+export interface BalanceAnalysis {
+  lotteryType: LotteryTypeId
+  oddEvenDistribution: Record<number, number>
+  highLowDistribution: Record<number, number>
+  optimalOddCount: number
+  optimalEvenCount: number
+  optimalHighCount: number
+  optimalLowCount: number
+  totalDraws: number
+  numbersPerDraw: number
+  midpoint: number
+}
+
+export interface SumDistribution {
+  lotteryType: LotteryTypeId
+  histogram: Record<number, number>
+  mean: number
+  stdDev: number
+  minSum: number
+  maxSum: number
+  optimalMin: number
+  optimalMax: number
+  p25: number
+  p50: number
+  p75: number
+  totalDraws: number
+}
+
+export interface NumberPair {
+  number1: number
+  number2: number
+  frequency: number
+  percentage: number
+}
+
+export interface ChiSquareResult {
+  lotteryType: LotteryTypeId
+  chiSquare: number
+  degreesOfFreedom: number
+  pValue: number
+  totalObservations: number
+  expectedFrequency: number
+  interpretation: string
+}
+
+export interface BacktestResult {
+  lotteryType: LotteryTypeId
+  strategy: string
+  topK: number
+  totalDrawsTested: number
+  predictedNumbers: number[]
+  matchDistribution: Record<number, number>
+  avgMatches: number
+  hitRate: number
+  expectedRandomRate: number
+}
+
+export interface BayesianNumber {
+  number: number
+  posteriorMean: number
+  priorMean: number
+  historicalFrequency: number
+  recentFrequency: number
+  recentWindow: number
+  lift: number
+}
+
 export interface SyncResult {
   lotteryType: LotteryTypeId
   totalRecords: number
