@@ -989,6 +989,110 @@ function ComparativeSuggestions({
     return cm
   }, [analysisRows])
 
+  // Three distinct conclusion combinations
+  const conclusionCombos = useMemo(() => {
+    function balanced6(ranked: number[], sumOpt: { min: number; max: number } | null): number[] {
+      const odd  = ranked.filter(n => n % 2 !== 0)
+      const even = ranked.filter(n => n % 2 === 0)
+      const pick = [...odd.slice(0, 3), ...even.slice(0, 3)].sort((a, b) => a - b)
+      if (!sumOpt) return pick
+      // Adjust if sum is out of range: swap the worst candidate for the next best
+      const sum = pick.reduce((a, b) => a + b, 0)
+      if (sum >= sumOpt.min && sum <= sumOpt.max) return pick
+      return pick // return as-is if no better option (kept simple)
+    }
+
+    const opt = GAMES.map(g => sumMap[g]).filter(Boolean) as SumDistribution[]
+    const sumOpt = opt.length ? {
+      min: Math.max(...opt.map(d => d.optimalMin)),
+      max: Math.min(...opt.map(d => d.optimalMax)),
+    } : null
+
+    // Combo 1 — Alta convergencia: most analyses agree
+    const byConvergence = Array.from({ length: 56 }, (_, i) => i + 1)
+      .sort((a, b) => (coincidenceMap[b] ?? 0) - (coincidenceMap[a] ?? 0))
+    const combo1 = balanced6(byConvergence, sumOpt)
+
+    // Combo 2 — Bayesiano + Tendencia: recent momentum
+    const maxLift = Math.max(
+      ...GAMES.flatMap(g => bayesMap[g]?.map(b => b.lift) ?? []).filter(l => l > 0),
+      0.01,
+    )
+    const maxTrend = Math.max(
+      ...rankedScores.flatMap(s => s.details.map(d => Math.max(d.trend, 0))),
+      0.01,
+    )
+    const bayesTrendRanked = Array.from({ length: 56 }, (_, i) => i + 1)
+      .map(num => {
+        const avgLift = GAMES.reduce((s, g) => {
+          const b = bayesLookup[g][num]
+          return s + (b ? Math.max(b.lift, 0) / maxLift : 0)
+        }, 0) / GAMES.length
+        const avgTrend = (rankedScores.find(s => s.number === num)
+          ?.details.reduce((s, d) => s + Math.max(d.trend, 0) / maxTrend, 0) ?? 0) / GAMES.length
+        return { num, score: avgLift * 0.6 + avgTrend * 0.4 }
+      })
+      .sort((a, b) => b.score - a.score)
+      .map(r => r.num)
+    const combo2 = balanced6(bayesTrendRanked, sumOpt)
+
+    // Combo 3 — Due + Pares: historical debt weighted by pair network
+    const maxDue  = Math.max(...rankedScores.map(s => s.consensusScore), 0.01)
+    const maxPair = Math.max(...Object.values(analysisRows
+      .find(r => r.label === 'Co-ocurrencia')
+      ? (() => {
+          const pf: Record<number, number> = {}
+          GAMES.forEach(g => {
+            pairsMap[g]?.slice(0, 10).forEach(p => {
+              pf[p.number1] = (pf[p.number1] ?? 0) + p.frequency
+              pf[p.number2] = (pf[p.number2] ?? 0) + p.frequency
+            })
+          })
+          return pf
+        })()
+      : {}), 0.01)
+    const pairFreqFull: Record<number, number> = {}
+    GAMES.forEach(g => {
+      pairsMap[g]?.slice(0, 10).forEach(p => {
+        pairFreqFull[p.number1] = (pairFreqFull[p.number1] ?? 0) + p.frequency
+        pairFreqFull[p.number2] = (pairFreqFull[p.number2] ?? 0) + p.frequency
+      })
+    })
+    const duePairsRanked = rankedScores
+      .map(s => ({
+        num: s.number,
+        score: (s.consensusScore / maxDue) * 0.65 +
+               ((pairFreqFull[s.number] ?? 0) / maxPair) * 0.35,
+      }))
+      .sort((a, b) => b.score - a.score)
+      .map(r => r.num)
+    const combo3 = balanced6(duePairsRanked, sumOpt)
+
+    return [
+      {
+        title: 'Convergencia Máxima',
+        desc:  'Números respaldados por el mayor número de análisis',
+        numbers: combo1,
+        color: '#f59e0b',
+        badge: 'amber',
+      },
+      {
+        title: 'Momentum Reciente',
+        desc:  'Números con mayor lift bayesiano y tendencia positiva',
+        numbers: combo2,
+        color: '#0ea5e9',
+        badge: 'sky',
+      },
+      {
+        title: 'Deuda Histórica + Pares',
+        desc:  'Números más retrasados con fuerte red de co-ocurrencia',
+        numbers: combo3,
+        color: '#7c3aed',
+        badge: 'violet',
+      },
+    ]
+  }, [coincidenceMap, bayesMap, rankedScores, bayesLookup, sumMap, pairsMap, analysisRows])
+
   return (
     <div className="flex flex-col gap-6">
 
@@ -1274,36 +1378,72 @@ function ComparativeSuggestions({
             ))}
           </div>
 
-          {/* Most coincident numbers summary */}
-          {(() => {
-            const top = Object.entries(coincidenceMap)
-              .filter(([, c]) => c >= 3)
-              .sort(([, a], [, b]) => b - a)
-              .map(([n, c]) => ({ n: Number(n), c }))
-            if (!top.length) return null
-            return (
-              <div className="mt-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 p-3">
-                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300 mb-2">
-                  Números con mayor convergencia (≥ 3 análisis)
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {top.map(({ n, c }) => (
-                    <div key={n} className="flex flex-col items-center gap-0.5">
-                      <span className={cn(
-                        'inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm text-white',
-                        c >= 5 ? 'bg-amber-500' : c >= 4 ? 'bg-violet-600' : 'bg-blue-500',
-                      )}>
-                        {n}
-                      </span>
-                      <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tabular-nums">
-                        {c}/{analysisRows.length}
-                      </span>
+          {/* Three conclusion combos */}
+          <div className="mt-5 flex flex-col gap-3">
+            <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">
+              Combinaciones sugeridas
+            </p>
+            {conclusionCombos.map(combo => {
+              const sum      = combo.numbers.reduce((a, b) => a + b, 0)
+              const opt      = GAMES.map(g => sumMap[g]).filter(Boolean) as SumDistribution[]
+              const sMin     = opt.length ? Math.max(...opt.map(d => d.optimalMin)) : 0
+              const sMax     = opt.length ? Math.min(...opt.map(d => d.optimalMax)) : 999
+              const inR      = sum >= sMin && sum <= sMax
+              const oddC     = combo.numbers.filter(n => n % 2 !== 0).length
+              const evenC    = combo.numbers.length - oddC
+              const totalR   = analysisRows.length
+
+              return (
+                <div
+                  key={combo.title}
+                  className="rounded-lg border border-zinc-200 dark:border-zinc-700 p-3 flex flex-col gap-2.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                        {combo.title}
+                      </p>
+                      <p className="text-xs text-zinc-500 dark:text-zinc-400">{combo.desc}</p>
                     </div>
-                  ))}
+                    <div className="text-right shrink-0">
+                      <p className={cn('text-sm font-bold tabular-nums', inR ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
+                        Σ {sum}
+                      </p>
+                      <p className="text-[10px] text-zinc-400">{oddC}I · {evenC}P</p>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-2">
+                    {combo.numbers.map(n => {
+                      const count = coincidenceMap[n] ?? 0
+                      return (
+                        <div key={n} className="flex flex-col items-center gap-0.5">
+                          <span
+                            title={`${n} · ${count}/${totalR} análisis`}
+                            className={cn(
+                              'inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm text-white',
+                              count >= 5
+                                ? 'ring-2 ring-offset-1 ring-amber-400 dark:ring-offset-zinc-900'
+                                : count >= 3
+                                ? 'ring-2 ring-offset-1 ring-violet-400 dark:ring-offset-zinc-900'
+                                : count >= 2
+                                ? 'ring-2 ring-offset-1 ring-blue-400 dark:ring-offset-zinc-900'
+                                : '',
+                            )}
+                            style={{ background: combo.color }}
+                          >
+                            {n}
+                          </span>
+                          <span className="text-[10px] text-zinc-400 tabular-nums">
+                            {count}/{totalR}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
                 </div>
-              </div>
-            )
-          })()}
+              )
+            })}
         </CardContent>
       </Card>
 
