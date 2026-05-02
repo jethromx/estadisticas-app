@@ -13,6 +13,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PageSpinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { cn, formatNumber } from '@/lib/utils'
 import type {
   LotteryTypeId, DueNumber, WindowedFrequency, BalanceAnalysis, SumDistribution,
@@ -1449,32 +1450,40 @@ function ComparativeSuggestions({
 
             {/* Stats row */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
-              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3">
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Suma</p>
-                <p className={cn('text-lg font-bold', inRange ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
-                  {total}
-                </p>
-                <p className="text-xs text-zinc-400 mt-0.5">
-                  {inRange ? `✓ ${sharedMin}–${sharedMax}` : `fuera de ${sharedMin}–${sharedMax}`}
-                </p>
-              </div>
-              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3">
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Balance</p>
-                <p className="text-lg font-bold text-zinc-800 dark:text-zinc-100">{oddCount}I · {evenCount}P</p>
-                <p className="text-xs text-zinc-400 mt-0.5">impar · par</p>
-              </div>
-              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3">
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Consenso ≥2 juegos</p>
-                <p className="text-lg font-bold text-violet-700 dark:text-violet-300">
-                  {selectedNums.filter(n => (byEnhanced[n]?.gamesInTop10 ?? 0) >= 2).length}/6
-                </p>
-              </div>
-              <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3">
-                <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Lift bayesiano +</p>
-                <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
-                  {selectedNums.filter(n => GAMES.some(g => (bayesLookup[g][n]?.lift ?? -1) > 0)).length}/6
-                </p>
-              </div>
+              <Tip content={`Suma de los 6 números seleccionados. El rango óptimo histórico compartido entre los 3 juegos es ${sharedMin}–${sharedMax}. Las combinaciones dentro de ese rango han ganado con mayor frecuencia.`} className="block">
+                <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3 cursor-help">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Suma</p>
+                  <p className={cn('text-lg font-bold', inRange ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
+                    {total}
+                  </p>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    {inRange ? `✓ ${sharedMin}–${sharedMax}` : `fuera de ${sharedMin}–${sharedMax}`}
+                  </p>
+                </div>
+              </Tip>
+              <Tip content="Distribución de impares y pares. Los sorteos históricos favorecen 3 impares + 3 pares. I = impar · P = par" className="block">
+                <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3 cursor-help">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Balance</p>
+                  <p className="text-lg font-bold text-zinc-800 dark:text-zinc-100">{oddCount}I · {evenCount}P</p>
+                  <p className="text-xs text-zinc-400 mt-0.5">impar · par</p>
+                </div>
+              </Tip>
+              <Tip content="Cuántos de los 6 números elegidos están en el top-10 de pendientes en 2 o más juegos simultáneamente. Mayor valor = mayor consenso entre los 3 sorteos" className="block">
+                <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3 cursor-help">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Consenso ≥2 juegos</p>
+                  <p className="text-lg font-bold text-violet-700 dark:text-violet-300">
+                    {selectedNums.filter(n => (byEnhanced[n]?.gamesInTop10 ?? 0) >= 2).length}/6
+                  </p>
+                </div>
+              </Tip>
+              <Tip content="Cuántos de los 6 números tienen lift bayesiano positivo en al menos un juego. Lift positivo = el modelo bayesiano estima que este número es más probable que el promedio histórico" className="block">
+                <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3 cursor-help">
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-1">Lift bayesiano +</p>
+                  <p className="text-lg font-bold text-emerald-600 dark:text-emerald-400">
+                    {selectedNums.filter(n => GAMES.some(g => (bayesLookup[g][n]?.lift ?? -1) > 0)).length}/6
+                  </p>
+                </div>
+              </Tip>
             </div>
           </div>
         </CardContent>
@@ -1606,22 +1615,28 @@ function ComparativeSuggestions({
                           <p className="font-semibold text-zinc-600 dark:text-zinc-400 mb-1">
                             {GAME_ICON[g]} {GAME_LABEL[g]}
                           </p>
-                          <p className="text-zinc-500">
-                            Due: <span className="font-medium text-zinc-700 dark:text-zinc-300">
-                              {d ? d.dueScore.toFixed(2) : '–'}
-                            </span>
-                          </p>
-                          <p className={cn((d?.trend ?? 0) > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500')}>
-                            Trend: <span className="font-medium">
-                              {d ? `${d.trend > 0 ? '▲' : '▼'}${Math.abs(d.trend).toFixed(1)}%` : '–'}
-                            </span>
-                          </p>
-                          {bay && (
-                            <p className={cn(bay.lift > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-400')}>
-                              Lift: <span className="font-medium">
-                                {bay.lift > 0 ? '+' : ''}{bay.lift.toFixed(2)}
+                          <Tip content="DueScore = sorteos sin salir ÷ intervalo promedio histórico. ≥1.0 = lleva más tiempo del habitual sin aparecer. ≥1.5 = muy pendiente" side="bottom">
+                            <p className="text-zinc-500 cursor-help w-full">
+                              Due: <span className="font-medium text-zinc-700 dark:text-zinc-300">
+                                {d ? d.dueScore.toFixed(2) : '–'}
                               </span>
                             </p>
+                          </Tip>
+                          <Tip content="Tendencia reciente: variación de frecuencia respecto al promedio histórico en los últimos 100 sorteos. ▲ = aparece más, ▼ = aparece menos" side="bottom">
+                            <p className={cn('cursor-help w-full', (d?.trend ?? 0) > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500')}>
+                              Trend: <span className="font-medium">
+                                {d ? `${d.trend > 0 ? '▲' : '▼'}${Math.abs(d.trend).toFixed(1)}%` : '–'}
+                              </span>
+                            </p>
+                          </Tip>
+                          {bay && (
+                            <Tip content="Lift bayesiano = (posterior − prior) / prior. Positivo = el modelo estima mayor probabilidad que el promedio histórico tras actualizar con sorteos recientes" side="bottom">
+                              <p className={cn('cursor-help w-full', bay.lift > 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-400')}>
+                                Lift: <span className="font-medium">
+                                  {bay.lift > 0 ? '+' : ''}{bay.lift.toFixed(2)}
+                                </span>
+                              </p>
+                            </Tip>
                           )}
                         </div>
                       )
@@ -1707,11 +1722,15 @@ function ComparativeSuggestions({
                       </p>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">{combo.desc}</p>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className={cn('text-sm font-bold tabular-nums', inR ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
-                        Σ {sum}
-                      </p>
-                      <p className="text-[10px] text-zinc-400">{oddC}I · {evenC}P</p>
+                    <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
+                      <Tip content={`Suma de los 6 números. Rango óptimo histórico: ${sMin}–${sMax}. ${inR ? '✓ Dentro del rango' : '⚠ Fuera del rango'}`}>
+                        <p className={cn('text-sm font-bold tabular-nums cursor-help', inR ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
+                          Σ {sum}
+                        </p>
+                      </Tip>
+                      <Tip content="Distribución de impares y pares en la combinación. I = impar · P = par">
+                        <p className="text-[10px] text-zinc-400 cursor-help">{oddC}I · {evenC}P</p>
+                      </Tip>
                     </div>
                   </div>
 
@@ -1719,27 +1738,31 @@ function ComparativeSuggestions({
                     {combo.numbers.map(n => {
                       const count = coincidenceMap[n] ?? 0
                       return (
-                        <div key={n} className="flex flex-col items-center gap-0.5">
-                          <span
-                            title={`${n} · ${count}/${totalR} análisis`}
-                            className={cn(
-                              'inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm text-white',
-                              count >= 5
-                                ? 'ring-2 ring-offset-1 ring-amber-400 dark:ring-offset-zinc-900'
-                                : count >= 3
-                                ? 'ring-2 ring-offset-1 ring-violet-400 dark:ring-offset-zinc-900'
-                                : count >= 2
-                                ? 'ring-2 ring-offset-1 ring-blue-400 dark:ring-offset-zinc-900'
-                                : '',
-                            )}
-                            style={{ background: combo.color }}
-                          >
-                            {n}
-                          </span>
-                          <span className="text-[10px] text-zinc-400 tabular-nums">
-                            {count}/{totalR}
-                          </span>
-                        </div>
+                        <Tip
+                          key={n}
+                          content={`Nº${n} aparece en ${count} de ${totalR} métodos de análisis. ${count >= 5 ? 'Respaldo muy alto' : count >= 3 ? 'Respaldo alto' : count >= 2 ? 'Respaldo medio' : 'Respaldo bajo'}`}
+                        >
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span
+                              className={cn(
+                                'inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm text-white cursor-help',
+                                count >= 5
+                                  ? 'ring-2 ring-offset-1 ring-amber-400 dark:ring-offset-zinc-900'
+                                  : count >= 3
+                                  ? 'ring-2 ring-offset-1 ring-violet-400 dark:ring-offset-zinc-900'
+                                  : count >= 2
+                                  ? 'ring-2 ring-offset-1 ring-blue-400 dark:ring-offset-zinc-900'
+                                  : '',
+                              )}
+                              style={{ background: combo.color }}
+                            >
+                              {n}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 tabular-nums">
+                              {count}/{totalR}
+                            </span>
+                          </div>
+                        </Tip>
                       )
                     })}
                   </div>
@@ -1816,34 +1839,42 @@ function ComparativeSuggestions({
                         </p>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400">{combo.desc}</p>
                       </div>
-                      <div className="text-right shrink-0">
-                        <p className={cn('text-sm font-bold tabular-nums', inR ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
-                          Σ {sum}
-                        </p>
-                        <p className="text-[10px] text-zinc-400">{oddC}I · {evenC}P</p>
+                      <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
+                        <Tip content={`Suma de los 6 números. Rango óptimo histórico: ${sMin}–${sMax}. ${inR ? '✓ Dentro del rango' : '⚠ Fuera del rango'}`}>
+                          <p className={cn('text-sm font-bold tabular-nums cursor-help', inR ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
+                            Σ {sum}
+                          </p>
+                        </Tip>
+                        <Tip content="Distribución de impares y pares en la combinación. I = impar · P = par">
+                          <p className="text-[10px] text-zinc-400 cursor-help">{oddC}I · {evenC}P</p>
+                        </Tip>
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
                       {combo.numbers.map(n => (
-                        <div key={n} className="flex flex-col items-center gap-0.5">
-                          <span
-                            title={`${n} · aparece en ${combo.hits[n] ?? 0}/5 combinaciones`}
-                            className={cn(
-                              'inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm text-white',
-                              (combo.hits[n] ?? 0) >= 4
-                                ? 'ring-2 ring-offset-1 ring-amber-400 dark:ring-offset-zinc-900'
-                                : (combo.hits[n] ?? 0) === 3
-                                ? 'ring-2 ring-offset-1 ring-violet-400 dark:ring-offset-zinc-900'
-                                : 'ring-2 ring-offset-1 ring-blue-300 dark:ring-offset-zinc-900',
-                            )}
-                            style={{ background: combo.color }}
-                          >
-                            {n}
-                          </span>
-                          <span className="text-[10px] text-zinc-400 tabular-nums">
-                            {combo.hits[n] ?? 0}/5
-                          </span>
-                        </div>
+                        <Tip
+                          key={n}
+                          content={`Nº${n} aparece en ${combo.hits[n] ?? 0} de las 5 combinaciones principales. ${(combo.hits[n] ?? 0) >= 4 ? 'Respaldo muy alto' : (combo.hits[n] ?? 0) === 3 ? 'Respaldo alto' : 'Respaldo medio'}`}
+                        >
+                          <div className="flex flex-col items-center gap-0.5">
+                            <span
+                              className={cn(
+                                'inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm text-white cursor-help',
+                                (combo.hits[n] ?? 0) >= 4
+                                  ? 'ring-2 ring-offset-1 ring-amber-400 dark:ring-offset-zinc-900'
+                                  : (combo.hits[n] ?? 0) === 3
+                                  ? 'ring-2 ring-offset-1 ring-violet-400 dark:ring-offset-zinc-900'
+                                  : 'ring-2 ring-offset-1 ring-blue-300 dark:ring-offset-zinc-900',
+                              )}
+                              style={{ background: combo.color }}
+                            >
+                              {n}
+                            </span>
+                            <span className="text-[10px] text-zinc-400 tabular-nums">
+                              {combo.hits[n] ?? 0}/5
+                            </span>
+                          </div>
+                        </Tip>
                       ))}
                     </div>
                   </div>
