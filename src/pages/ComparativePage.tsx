@@ -2145,21 +2145,61 @@ function ComparativeSuggestions({
           .sort((a, b) => (megaVoteMap[b] ?? 0) - (megaVoteMap[a] ?? 0))
         const maxVotes = megaVoteMap[topVoted[0]] ?? 1
 
-        function pickMejor(nOdd: number, nEven: number): number[] {
-          const odd  = topVoted.filter(n => n % 2 !== 0)
-          const even = topVoted.filter(n => n % 2 === 0)
-          return [...odd.slice(0, nOdd), ...even.slice(0, nEven)].sort((a, b) => a - b)
+        const opt  = GAMES.map(g => sumMap[g]).filter(Boolean) as SumDistribution[]
+        const sMin = opt.length ? Math.max(...opt.map(d => d.optimalMin)) : 0
+        const sMax = opt.length ? Math.min(...opt.map(d => d.optimalMax)) : 999
+        // Absolute bounds across all draws (for the range bar)
+        const absMin = opt.length ? Math.min(...opt.map(d => d.minSum)) : 21
+        const absMax = opt.length ? Math.max(...opt.map(d => d.maxSum)) : 336
+        const target = Math.round((sMin + sMax) / 2)
+
+        // Exhaustive search over top-10 candidates per parity to maximise
+        // megaVote total while keeping Σ inside [sMin, sMax].
+        function combos(arr: number[], k: number): number[][] {
+          if (k === 0) return [[]]
+          if (arr.length < k) return []
+          const [first, ...rest] = arr
+          return [
+            ...combos(rest, k - 1).map(c => [first, ...c]),
+            ...combos(rest, k),
+          ]
+        }
+
+        function pickMejorInRange(nOdd: number, nEven: number): { numbers: number[]; inRange: boolean } {
+          const oddPool  = topVoted.filter(n => n % 2 !== 0).slice(0, 10)
+          const evenPool = topVoted.filter(n => n % 2 === 0).slice(0, 10)
+
+          let bestNums:     number[] = []
+          let bestVotes     = -1
+          let fallbackNums: number[] = []
+          let fallbackDist  = Infinity
+
+          for (const oc of combos(oddPool, nOdd)) {
+            for (const ec of combos(evenPool, nEven)) {
+              const combo = [...oc, ...ec]
+              const sum   = combo.reduce((a, b) => a + b, 0)
+              const votes = combo.reduce((a, n) => a + (megaVoteMap[n] ?? 0), 0)
+              if (sum >= sMin && sum <= sMax) {
+                if (votes > bestVotes) { bestVotes = votes; bestNums = combo }
+              } else {
+                const dist = Math.abs(sum - target)
+                if (dist < fallbackDist) { fallbackDist = dist; fallbackNums = combo }
+              }
+            }
+          }
+
+          const inRange = bestNums.length > 0
+          return {
+            numbers: (inRange ? bestNums : fallbackNums).sort((a, b) => a - b),
+            inRange,
+          }
         }
 
         const propuestas = [
-          { title: '3I + 3P', desc: 'Balance estándar — 3 impares + 3 pares', numbers: pickMejor(3, 3) },
-          { title: '4I + 2P', desc: 'Priorizando impares',                     numbers: pickMejor(4, 2) },
-          { title: '2I + 4P', desc: 'Priorizando pares',                       numbers: pickMejor(2, 4) },
+          { title: '3I + 3P', desc: 'Balance estándar — 3 impares + 3 pares', ...pickMejorInRange(3, 3) },
+          { title: '4I + 2P', desc: 'Priorizando impares',                     ...pickMejorInRange(4, 2) },
+          { title: '2I + 4P', desc: 'Priorizando pares',                       ...pickMejorInRange(2, 4) },
         ]
-
-        const opt = GAMES.map(g => sumMap[g]).filter(Boolean) as SumDistribution[]
-        const sMin = opt.length ? Math.max(...opt.map(d => d.optimalMin)) : 0
-        const sMax = opt.length ? Math.min(...opt.map(d => d.optimalMax)) : 999
 
         return (
           <Card className="border-2 border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-900/10">
@@ -2168,7 +2208,9 @@ function ComparativeSuggestions({
                 🏆 Mejores Propuestas
               </CardTitle>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Síntesis final — números respaldados por la mayor cantidad de análisis y combinaciones.
+                Síntesis final — números respaldados por la mayor cantidad de análisis y combinaciones,
+                con suma optimizada dentro del rango óptimo histórico
+                (<b className="text-zinc-700 dark:text-zinc-200">Σ {sMin}–{sMax}</b>).
                 Se consideraron <b className="text-zinc-700 dark:text-zinc-200">{totalSources} listas</b> en total
                 ({analysisRows.length} métodos · 5 combinaciones · {derivedCombos.length} derivadas).
               </p>
@@ -2177,9 +2219,15 @@ function ComparativeSuggestions({
               <div className="flex flex-col gap-4">
                 {propuestas.map(prop => {
                   const sum  = prop.numbers.reduce((a, b) => a + b, 0)
-                  const inR  = sum >= sMin && sum <= sMax
                   const oddC = prop.numbers.filter(n => n % 2 !== 0).length
                   const evnC = prop.numbers.length - oddC
+
+                  // Position of sum in the absolute range [absMin, absMax] (0–100 %)
+                  const totalSpan  = absMax - absMin || 1
+                  const pctSum     = Math.max(0, Math.min(100, ((sum  - absMin) / totalSpan) * 100))
+                  const pctOptL    = Math.max(0, Math.min(100, ((sMin - absMin) / totalSpan) * 100))
+                  const pctOptW    = Math.max(0, Math.min(100 - pctOptL, ((sMax - sMin) / totalSpan) * 100))
+
                   return (
                     <div key={prop.title} className="rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-3">
                       <div className="flex items-start justify-between gap-2">
@@ -2188,14 +2236,40 @@ function ComparativeSuggestions({
                           <p className="text-xs text-zinc-500 dark:text-zinc-400">{prop.desc}</p>
                         </div>
                         <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
-                          <Tip content={`Suma total. Rango óptimo: ${sMin}–${sMax}`}>
-                            <p className={cn('text-sm font-bold tabular-nums cursor-help', inR ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
-                              Σ {sum}
+                          <Tip content={`Suma de los 6 números. Rango óptimo histórico: ${sMin}–${sMax}. ${prop.inRange ? '✓ Dentro del rango' : '⚠ Fuera del rango — no existe combinación en el top-10 que alcance el rango exacto'}`}>
+                            <p className={cn('text-sm font-bold tabular-nums cursor-help',
+                              prop.inRange ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
+                              Σ {sum} {prop.inRange ? '✓' : '~'}
                             </p>
                           </Tip>
                           <p className="text-[10px] text-zinc-400">{oddC}I · {evnC}P</p>
                         </div>
                       </div>
+
+                      {/* Σ range bar */}
+                      <div className="flex flex-col gap-1">
+                        <div className="relative h-3 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                          {/* optimal zone */}
+                          <div
+                            className="absolute top-0 h-full rounded-full bg-emerald-200 dark:bg-emerald-900/60"
+                            style={{ left: `${pctOptL}%`, width: `${pctOptW}%` }}
+                          />
+                          {/* sum marker */}
+                          <div
+                            className={cn(
+                              'absolute top-0 h-full w-1 rounded-full -translate-x-1/2',
+                              prop.inRange ? 'bg-emerald-500' : 'bg-amber-400',
+                            )}
+                            style={{ left: `${pctSum}%` }}
+                          />
+                        </div>
+                        <div className="flex justify-between text-[9px] text-zinc-400 tabular-nums">
+                          <span>{absMin}</span>
+                          <span className="text-emerald-600 dark:text-emerald-400 font-medium">óptimo {sMin}–{sMax}</span>
+                          <span>{absMax}</span>
+                        </div>
+                      </div>
+
                       <div className="flex flex-wrap gap-2">
                         {prop.numbers.map(n => {
                           const votes = megaVoteMap[n] ?? 0
