@@ -1,5 +1,4 @@
 import { useMemo, useState, useEffect } from 'react'
-import arimaPromise from 'arima/async'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Legend, CartesianGrid, ReferenceLine,
@@ -1196,11 +1195,12 @@ function ArimaComparison({
       {/* Methodology note */}
       <div className="rounded-lg border border-dashed border-zinc-200 dark:border-zinc-700 p-3">
         <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-          <b className="text-zinc-600 dark:text-zinc-300">ARIMA(1,0,0) — Modelo autorregresivo:</b>{' '}
-          Se entrena un modelo AR(1) para cada número usando 6 ventanas de sorteos (50, 100, 150, 200, 250, 300 sorteos).
-          La serie temporal es la frecuencia incremental entre ventanas consecutivas.
-          El pronóstico predice la frecuencia incremental en el siguiente período.
-          Un valor positivo indica que el número tiende a aparecer con mayor frecuencia conforme avanza la ventana.
+          <b className="text-zinc-600 dark:text-zinc-300">Tendencia lineal — 3 períodos:</b>{' '}
+          Para cada número se calculan las frecuencias en tres períodos consecutivos:
+          sorteos 101–300 (antiguo), 51–100 (intermedio) y 1–50 (reciente).
+          El pronóstico es la extrapolación lineal por mínimos cuadrados:{' '}
+          <em>forecast = reciente + (reciente − antiguo) / 2</em>.
+          Un valor alto indica que la frecuencia del número ha aumentado en los sorteos más recientes.
         </p>
       </div>
 
@@ -2796,108 +2796,50 @@ export function ComparativePage() {
   const { data: wfRevancha,    isLoading: l5 } = useWindowedFrequencies('REVANCHA',   100)
   const { data: wfRevanchita,  isLoading: l6 } = useWindowedFrequencies('REVANCHITA', 100)
 
-  // ARIMA windows (100 already fetched above; reuse wfMelate/wfRevancha/wfRevanchita for w=100)
+  // Trend windows — w=100 already loaded above; only w=50 and w=300 are new (6 extra calls).
   const { data: wf50Melate      } = useWindowedFrequencies('MELATE',       50)
-  const { data: wf150Melate     } = useWindowedFrequencies('MELATE',      150)
-  const { data: wf200Melate     } = useWindowedFrequencies('MELATE',      200)
-  const { data: wf250Melate     } = useWindowedFrequencies('MELATE',      250)
   const { data: wf300Melate     } = useWindowedFrequencies('MELATE',      300)
   const { data: wf50Revancha    } = useWindowedFrequencies('REVANCHA',     50)
-  const { data: wf150Revancha   } = useWindowedFrequencies('REVANCHA',    150)
-  const { data: wf200Revancha   } = useWindowedFrequencies('REVANCHA',    200)
-  const { data: wf250Revancha   } = useWindowedFrequencies('REVANCHA',    250)
   const { data: wf300Revancha   } = useWindowedFrequencies('REVANCHA',    300)
   const { data: wf50Revanchita  } = useWindowedFrequencies('REVANCHITA',   50)
-  const { data: wf150Revanchita } = useWindowedFrequencies('REVANCHITA',  150)
-  const { data: wf200Revanchita } = useWindowedFrequencies('REVANCHITA',  200)
-  const { data: wf250Revanchita } = useWindowedFrequencies('REVANCHITA',  250)
   const { data: wf300Revanchita } = useWindowedFrequencies('REVANCHITA',  300)
 
-  // ARIMA state
-  const [arimaForecasts, setArimaForecasts] = useState<Record<string, Record<number, number>>>({})
-  const [arimaReady, setArimaReady] = useState(false)
-
-  useEffect(() => {
-    // All 18 window arrays must be loaded (w=100 reuses existing wfMelate etc.)
+  // Linear trend forecast — synchronous, no external library.
+  // For 3 evenly-spaced points [oldest, middle, recent], least-squares slope = (recent − oldest)/2,
+  // so forecast = recent + slope. Equivalent to AR(1) extrapolation on a 3-point series.
+  const arimaForecasts = useMemo(() => {
     if (
-      !wf50Melate || !wfMelate || !wf150Melate || !wf200Melate || !wf250Melate || !wf300Melate ||
-      !wf50Revancha || !wfRevancha || !wf150Revancha || !wf200Revancha || !wf250Revancha || !wf300Revancha ||
-      !wf50Revanchita || !wfRevanchita || !wf150Revanchita || !wf200Revanchita || !wf250Revanchita || !wf300Revanchita
-    ) return
+      !wf50Melate || !wfMelate || !wf300Melate ||
+      !wf50Revancha || !wfRevancha || !wf300Revancha ||
+      !wf50Revanchita || !wfRevanchita || !wf300Revanchita
+    ) return {} as Record<string, Record<number, number>>
 
-    const windowedDataByGame: Record<string, Record<number, WindowedFrequency[]>> = {
-      MELATE: {
-        50:  wf50Melate,
-        100: wfMelate,
-        150: wf150Melate,
-        200: wf200Melate,
-        250: wf250Melate,
-        300: wf300Melate,
-      },
-      REVANCHA: {
-        50:  wf50Revancha,
-        100: wfRevancha,
-        150: wf150Revancha,
-        200: wf200Revancha,
-        250: wf250Revancha,
-        300: wf300Revancha,
-      },
-      REVANCHITA: {
-        50:  wf50Revanchita,
-        100: wfRevanchita,
-        150: wf150Revanchita,
-        200: wf200Revanchita,
-        250: wf250Revanchita,
-        300: wf300Revanchita,
-      },
+    const byGame: Record<string, Record<number, WindowedFrequency[]>> = {
+      MELATE:     { 50: wf50Melate,     100: wfMelate,     300: wf300Melate },
+      REVANCHA:   { 50: wf50Revancha,   100: wfRevancha,   300: wf300Revancha },
+      REVANCHITA: { 50: wf50Revanchita, 100: wfRevanchita, 300: wf300Revanchita },
     }
 
-    let cancelled = false
-
-    arimaPromise.then(ARIMA => {
-      if (cancelled) return
-      const result: Record<string, Record<number, number>> = {}
-
-      for (const game of GAMES) {
-        result[game] = {}
-        const byWindow = windowedDataByGame[game]
-        for (let num = 1; num <= 56; num++) {
-          const freqAt = (w: number) => byWindow[w]?.find(wf => wf.number === num)?.frequency ?? 0
-          // Oldest → most recent so ARIMA sees trend direction correctly
-          const ts: number[] = [
-            freqAt(300) - freqAt(250),
-            freqAt(250) - freqAt(200),
-            freqAt(200) - freqAt(150),
-            freqAt(150) - freqAt(100),
-            freqAt(100) - freqAt(50),
-            freqAt(50),
-          ].map(v => Math.max(v, 0))
-          try {
-            const model = new ARIMA({ p: 1, d: 0, q: 0, verbose: false })
-            model.train(ts)
-            const [forecasts] = model.predict(1)
-            model.destroy()
-            result[game][num] = Math.max(forecasts[0], 0)
-          } catch {
-            result[game][num] = 0
-          }
-        }
+    const result: Record<string, Record<number, number>> = {}
+    for (const game of GAMES) {
+      result[game] = {}
+      const wnd = byGame[game]
+      for (let num = 1; num <= 56; num++) {
+        const f = (w: number) => wnd[w]?.find(wf => wf.number === num)?.frequency ?? 0
+        const oldest = Math.max(f(300) - f(100), 0)  // draws 101-300
+        const recent = Math.max(f(50), 0)             // draws 1-50
+        const slope  = (recent - oldest) / 2
+        result[game][num] = Math.max(recent + slope, 0)
       }
-
-      if (!cancelled) {
-        setArimaForecasts(result)
-        setArimaReady(true)
-      }
-    }).catch(e => {
-      console.error('ARIMA WASM failed to load:', e)
-      if (!cancelled) setArimaReady(true)
-    })
-    return () => { cancelled = true }
+    }
+    return result
   }, [
-    wf50Melate, wfMelate, wf150Melate, wf200Melate, wf250Melate, wf300Melate,
-    wf50Revancha, wfRevancha, wf150Revancha, wf200Revancha, wf250Revancha, wf300Revancha,
-    wf50Revanchita, wfRevanchita, wf150Revanchita, wf200Revanchita, wf250Revanchita, wf300Revanchita,
+    wf50Melate, wfMelate, wf300Melate,
+    wf50Revancha, wfRevancha, wf300Revancha,
+    wf50Revanchita, wfRevanchita, wf300Revanchita,
   ])
+
+  const arimaReady = Object.keys(arimaForecasts).length > 0
 
   // Distribucion tab data (loads independently)
   const { data: balMelate     } = useBalanceAnalysis('MELATE')
@@ -3214,10 +3156,10 @@ export function ComparativePage() {
         <TabsContent value="arima">
           <Card>
             <CardHeader>
-              <CardTitle>Pronóstico ARIMA — Frecuencia por período</CardTitle>
+              <CardTitle>Tendencia — Frecuencia por período</CardTitle>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                Modelo autorregresivo AR(1) entrenado sobre la frecuencia incremental de cada número
-                en 6 ventanas de sorteos (50 → 300). Predice la tendencia en el siguiente período.
+                Extrapolación lineal sobre 3 períodos (sorteos 101–300 · 51–100 · 1–50).
+                Números con mayor valor tienen frecuencia creciente en los sorteos más recientes.
               </p>
             </CardHeader>
             <CardContent>
