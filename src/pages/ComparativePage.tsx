@@ -2311,6 +2311,479 @@ function ComparativeSuggestions({
   )
 }
 
+// ── CombinationGenerator ──────────────────────────────────────────────────────
+
+interface GenWeights {
+  due:       number
+  bayes:     number
+  arima:     number
+  backtest:  number
+  pairs:     number
+  consensus: number
+}
+
+interface GeneratedCombo {
+  numbers: number[]
+  sum:     number
+  inRange: boolean
+  scores:  { due: number; bayes: number; arima: number; backtest: number; pairs: number; consensus: number }
+}
+
+const WEIGHT_LABELS: Record<keyof GenWeights, string> = {
+  due: 'Por salir', bayes: 'Bayesiano', arima: 'ARIMA',
+  backtest: 'Backtest', pairs: 'Co-ocurrencia', consensus: 'Consenso',
+}
+const WEIGHT_COLORS: Record<keyof GenWeights, string> = {
+  due: '#f59e0b', bayes: '#8b5cf6', arima: '#ec4899',
+  backtest: '#0ea5e9', pairs: '#10b981', consensus: '#7c3aed',
+}
+
+function CombinationGenerator({
+  rankedScores, bayesMap, dueMap, backtestMap, pairsMap, sumMap, arimaForecasts, arimaReady,
+}: {
+  rankedScores:   NumberScore[]
+  bayesMap:       Record<string, BayesianNumber[] | undefined>
+  dueMap:         Record<string, DueNumber[]>
+  backtestMap:    Record<string, BacktestResult | undefined>
+  pairsMap:       Record<string, NumberPair[] | undefined>
+  sumMap:         Record<string, SumDistribution | undefined>
+  arimaForecasts: Record<string, Record<number, number>>
+  arimaReady:     boolean
+}) {
+  const [weights, setWeights] = useState<GenWeights>({
+    due: 70, bayes: 80, arima: 50, backtest: 65, pairs: 40, consensus: 75,
+  })
+  const [numCombos,   setNumCombos]   = useState(5)
+  const [balance,     setBalance]     = useState<'3+3' | '4+2' | '2+4' | 'libre'>('3+3')
+  const [sigmaStrict, setSigmaStrict] = useState(true)
+  const [diversity,   setDiversity]   = useState(65)
+  const [results,     setResults]     = useState<GeneratedCombo[]>([])
+  const [generated,   setGenerated]   = useState(false)
+
+  const opt = useMemo(() => {
+    const arr = GAMES.map(g => sumMap[g]).filter(Boolean) as SumDistribution[]
+    return {
+      sMin:   arr.length ? Math.max(...arr.map(d => d.optimalMin)) : 0,
+      sMax:   arr.length ? Math.min(...arr.map(d => d.optimalMax)) : 999,
+      absMin: arr.length ? Math.min(...arr.map(d => d.minSum)) : 21,
+      absMax: arr.length ? Math.max(...arr.map(d => d.maxSum)) : 336,
+    }
+  }, [sumMap])
+
+  // Per-number normalized scores for each analysis (all values 0–1)
+  const baseScores = useMemo(() => {
+    const nums = Array.from({ length: 56 }, (_, i) => i + 1)
+
+    const dueRaw: Record<number, number> = {}
+    nums.forEach(n => {
+      dueRaw[n] = GAMES.reduce((acc, g) => acc + (dueMap[g]?.find(d => d.number === n)?.dueScore ?? 0), 0) / GAMES.length
+    })
+    const maxDue = Math.max(...Object.values(dueRaw), 0.001)
+
+    const bayesRaw: Record<number, number> = {}
+    nums.forEach(n => {
+      bayesRaw[n] = GAMES.map(g => Math.max(bayesMap[g]?.find(b => b.number === n)?.lift ?? 0, 0))
+        .reduce((a, b) => a + b, 0) / GAMES.length
+    })
+    const maxBayes = Math.max(...Object.values(bayesRaw), 0.001)
+
+    const arimaRaw: Record<number, number> = {}
+    nums.forEach(n => {
+      arimaRaw[n] = GAMES.map(g => arimaForecasts[g]?.[n] ?? 0).reduce((a, b) => a + b, 0) / GAMES.length
+    })
+    const maxArima = Math.max(...Object.values(arimaRaw), 0.001)
+
+    const raw = nums.map(n => ({
+      n,
+      due:      dueRaw[n] / maxDue,
+      bayes:    bayesRaw[n] / maxBayes,
+      arima:    arimaRaw[n] / maxArima,
+      backtest: GAMES.filter(g => backtestMap[g]?.predictedNumbers.includes(n)).length / GAMES.length,
+      pairs:    GAMES.reduce((acc, g) => acc + (pairsMap[g]?.slice(0, 10).some(p => p.number1 === n || p.number2 === n) ? 1 : 0), 0) / GAMES.length,
+      consensus: 0,
+    }))
+
+    return raw.map(s => {
+      const idx = rankedScores.findIndex(r => r.number === s.n)
+      return { ...s, consensus: idx >= 0 ? 1 - idx / (raw.length - 1) : 0 }
+    })
+  }, [rankedScores, bayesMap, dueMap, backtestMap, pairsMap, arimaForecasts])
+
+  function generate() {
+    const { sMin, sMax } = opt
+    const totalW = Math.max(
+      weights.due + weights.bayes + weights.arima + weights.backtest + weights.pairs + weights.consensus,
+      1,
+    )
+
+    function wscore(s: typeof baseScores[0]): number {
+      return (
+        s.due      * weights.due +
+        s.bayes    * weights.bayes +
+        s.arima    * weights.arima +
+        s.backtest * weights.backtest +
+        s.pairs    * weights.pairs +
+        s.consensus * weights.consensus
+      ) / totalW
+    }
+
+    function combArr(arr: number[], k: number): number[][] {
+      if (k === 0) return [[]]
+      if (arr.length < k) return []
+      const [first, ...rest] = arr
+      return [...combArr(rest, k - 1).map(c => [first, ...c]), ...combArr(rest, k)]
+    }
+
+    const usage: Record<number, number> = {}
+    const target = (sMin + sMax) / 2
+    const divFactor = diversity / 100
+    const combos: GeneratedCombo[] = []
+
+    for (let iter = 0; iter < numCombos; iter++) {
+      // Apply diversity penalty to already-used numbers
+      const scoreMap: Record<number, number> = {}
+      baseScores.forEach(s => {
+        scoreMap[s.n] = wscore(s) * Math.pow(1 - divFactor * 0.4, Math.min(usage[s.n] ?? 0, 4))
+      })
+      const ranked = Array.from({ length: 56 }, (_, i) => i + 1)
+        .sort((a, b) => (scoreMap[b] ?? 0) - (scoreMap[a] ?? 0))
+
+      let bestCombo:    number[] | null = null
+      let bestScore     = -1
+      let fallbackCombo: number[] | null = null
+      let fallbackDist  = Infinity
+
+      const POOL = 12
+
+      function search(pool: number[][]) {
+        for (const combo of pool) {
+          const sum = combo.reduce((a, b) => a + b, 0)
+          const sc  = combo.reduce((a, n) => a + (scoreMap[n] ?? 0), 0)
+          if (sum >= sMin && sum <= sMax) {
+            if (sc > bestScore) { bestScore = sc; bestCombo = combo }
+          } else {
+            const dist = Math.abs(sum - target)
+            if (dist < fallbackDist) { fallbackDist = dist; fallbackCombo = combo }
+          }
+        }
+      }
+
+      function bestOf(pool: number[][]): number[] {
+        return pool.reduce((best, c) => {
+          const sc = c.reduce((a, n) => a + (scoreMap[n] ?? 0), 0)
+          const bsc = best.reduce((a, n) => a + (scoreMap[n] ?? 0), 0)
+          return sc > bsc ? c : best
+        }, pool[0] ?? [])
+      }
+
+      if (balance === 'libre') {
+        const pool = combArr(ranked.slice(0, 15), 6)
+        if (sigmaStrict) { search(pool) } else { bestCombo = bestOf(pool) }
+      } else {
+        const nOdd  = balance === '4+2' ? 4 : balance === '2+4' ? 2 : 3
+        const nEven = 6 - nOdd
+        const odds  = ranked.filter(n => n % 2 !== 0).slice(0, POOL)
+        const evens = ranked.filter(n => n % 2 === 0).slice(0, POOL)
+        const pool  = combArr(odds, nOdd).flatMap(oc => combArr(evens, nEven).map(ec => [...oc, ...ec]))
+        if (sigmaStrict) { search(pool) } else { bestCombo = bestOf(pool) }
+      }
+
+      const final = (sigmaStrict
+        ? (bestCombo ?? fallbackCombo ?? ranked.slice(0, 6))
+        : (bestCombo ?? ranked.slice(0, 6))
+      ).sort((a, b) => a - b)
+
+      final.forEach(n => { usage[n] = (usage[n] ?? 0) + 1 })
+
+      const avgS = (key: keyof GenWeights) =>
+        final.reduce((a, n) => a + (baseScores.find(s => s.n === n)?.[key] ?? 0), 0) / final.length
+
+      const sum = final.reduce((a, b) => a + b, 0)
+      combos.push({
+        numbers: final,
+        sum,
+        inRange: sum >= sMin && sum <= sMax,
+        scores: {
+          due:       avgS('due'),
+          bayes:     avgS('bayes'),
+          arima:     avgS('arima'),
+          backtest:  avgS('backtest'),
+          pairs:     avgS('pairs'),
+          consensus: avgS('consensus'),
+        },
+      })
+    }
+
+    setResults(combos)
+    setGenerated(true)
+  }
+
+  const { sMin, sMax, absMin, absMax } = opt
+
+  return (
+    <div className="flex flex-col gap-6">
+
+      {/* ── Config card ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">⚙️ Parámetros de Generación</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Ajusta el peso de cada análisis para orientar la selección de números.
+            La suma (Σ) óptima compartida entre los 3 juegos es{' '}
+            <b className="text-zinc-700 dark:text-zinc-200">{sMin}–{sMax}</b>.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-5">
+
+            {/* Weight sliders */}
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-zinc-400 mb-3">
+                Peso por análisis
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {(Object.keys(weights) as (keyof GenWeights)[]).map(key => (
+                  <div key={key} className="flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs text-zinc-600 dark:text-zinc-400">
+                        {WEIGHT_LABELS[key]}
+                        {key === 'arima' && !arimaReady && (
+                          <span className="ml-1 text-[9px] text-zinc-400">(calculando…)</span>
+                        )}
+                      </label>
+                      <span className="text-xs font-bold tabular-nums" style={{ color: WEIGHT_COLORS[key] }}>
+                        {weights[key]}%
+                      </span>
+                    </div>
+                    <input
+                      type="range" min={0} max={100} step={5}
+                      value={weights[key]}
+                      disabled={key === 'arima' && !arimaReady}
+                      onChange={e => setWeights(prev => ({ ...prev, [key]: Number(e.target.value) }))}
+                      className="w-full h-1.5 accent-violet-600"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Settings row */}
+            <div className="flex flex-wrap gap-4 items-end border-t border-zinc-100 dark:border-zinc-800 pt-4">
+
+              {/* Num combos */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-zinc-500 dark:text-zinc-400">Combinaciones</label>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setNumCombos(v => Math.max(1, v - 1))}
+                    className="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold flex items-center justify-center"
+                  >−</button>
+                  <span className="w-8 text-center font-bold text-zinc-800 dark:text-zinc-200 tabular-nums text-sm">
+                    {numCombos}
+                  </span>
+                  <button
+                    onClick={() => setNumCombos(v => Math.min(10, v + 1))}
+                    className="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold flex items-center justify-center"
+                  >+</button>
+                </div>
+              </div>
+
+              {/* Balance */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-zinc-500 dark:text-zinc-400">Balance I/P</label>
+                <div className="flex gap-1">
+                  {(['3+3', '4+2', '2+4', 'libre'] as const).map(b => (
+                    <button
+                      key={b}
+                      onClick={() => setBalance(b)}
+                      className={cn(
+                        'px-2.5 py-1 rounded-md text-xs font-medium border transition-colors',
+                        balance === b
+                          ? 'bg-violet-600 text-white border-violet-600'
+                          : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800',
+                      )}
+                    >
+                      {b === 'libre' ? 'Libre' : b}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Sigma mode */}
+              <div className="flex flex-col gap-1">
+                <label className="text-xs text-zinc-500 dark:text-zinc-400">Σ Rango</label>
+                <div className="flex gap-1">
+                  {([true, false] as const).map(strict => (
+                    <button
+                      key={String(strict)}
+                      onClick={() => setSigmaStrict(strict)}
+                      className={cn(
+                        'px-2.5 py-1 rounded-md text-xs font-medium border transition-colors',
+                        sigmaStrict === strict
+                          ? 'bg-emerald-600 text-white border-emerald-600'
+                          : 'bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800',
+                      )}
+                    >
+                      {strict ? `Óptimo ${sMin}–${sMax}` : 'Flexible'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Diversity */}
+              <div className="flex flex-col gap-1 flex-1 min-w-[140px]">
+                <Tip
+                  content="Penaliza números que ya aparecieron en combinaciones anteriores, forzando mayor variedad entre combinaciones."
+                  side="top"
+                >
+                  <div className="flex items-center justify-between w-full cursor-help">
+                    <label className="text-xs text-zinc-500 dark:text-zinc-400">Diversidad</label>
+                    <span className="text-xs font-bold tabular-nums text-violet-600">{diversity}%</span>
+                  </div>
+                </Tip>
+                <input
+                  type="range" min={0} max={100} step={5}
+                  value={diversity}
+                  onChange={e => setDiversity(Number(e.target.value))}
+                  className="w-full h-1.5 accent-violet-600"
+                />
+              </div>
+
+            </div>
+
+            {/* Generate button */}
+            <button
+              onClick={generate}
+              className="w-full py-3 rounded-xl bg-violet-600 hover:bg-violet-700 active:bg-violet-800 text-white font-bold text-sm transition-colors"
+            >
+              🎲 Generar {numCombos} combinación{numCombos !== 1 ? 'es' : ''}
+            </button>
+
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── Results ── */}
+      {generated && results.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-violet-800 dark:text-violet-300">🎯 Combinaciones Generadas</CardTitle>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">
+              Rango Σ óptimo: <b className="text-zinc-700 dark:text-zinc-200">{sMin}–{sMax}</b> ·
+              Verde = impares · Azul = pares · Las barras muestran el aporte de cada análisis.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-col gap-4">
+              {results.map((combo, idx) => {
+                const totalSpan = absMax - absMin || 1
+                const pctSum  = Math.max(0, Math.min(100, ((combo.sum  - absMin) / totalSpan) * 100))
+                const pctOptL = Math.max(0, Math.min(100, ((sMin - absMin) / totalSpan) * 100))
+                const pctOptW = Math.max(0, Math.min(100 - pctOptL, ((sMax - sMin) / totalSpan) * 100))
+
+                return (
+                  <div
+                    key={idx}
+                    className={cn(
+                      'rounded-xl border p-4 flex flex-col gap-3',
+                      combo.inRange
+                        ? 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/30 dark:bg-emerald-900/10'
+                        : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900',
+                    )}
+                  >
+                    {/* Header row */}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 w-5 shrink-0">
+                        #{idx + 1}
+                      </span>
+                      <div className="flex flex-wrap gap-1.5 flex-1">
+                        {combo.numbers.map(n => (
+                          <span
+                            key={n}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-base text-white shadow-sm"
+                            style={{ background: n % 2 !== 0 ? '#7c3aed' : '#0ea5e9' }}
+                          >
+                            {n}
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5 shrink-0">
+                        <Tip content={`Suma de los 6 números. Rango óptimo: ${sMin}–${sMax}. ${combo.inRange ? '✓ Dentro del rango' : '⚠ Fuera del rango'}`}>
+                          <span className={cn(
+                            'text-sm font-bold tabular-nums cursor-help',
+                            combo.inRange ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500',
+                          )}>
+                            Σ {combo.sum} {combo.inRange ? '✓' : '~'}
+                          </span>
+                        </Tip>
+                        <button
+                          onClick={() => navigator.clipboard?.writeText(combo.numbers.join(' - '))}
+                          className="text-[10px] text-zinc-400 hover:text-violet-500 transition-colors"
+                        >
+                          📋 copiar
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Σ range bar */}
+                    <div className="flex flex-col gap-0.5">
+                      <div className="relative h-2.5 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                        <div
+                          className="absolute top-0 h-full rounded-full bg-emerald-200 dark:bg-emerald-900/60"
+                          style={{ left: `${pctOptL}%`, width: `${pctOptW}%` }}
+                        />
+                        <div
+                          className={cn(
+                            'absolute top-0 h-full w-1 rounded-full -translate-x-1/2',
+                            combo.inRange ? 'bg-emerald-500' : 'bg-amber-400',
+                          )}
+                          style={{ left: `${pctSum}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-[9px] text-zinc-400 tabular-nums">
+                        <span>{absMin}</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                          óptimo {sMin}–{sMax}
+                        </span>
+                        <span>{absMax}</span>
+                      </div>
+                    </div>
+
+                    {/* Per-analysis score breakdown */}
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1 border-t border-zinc-100 dark:border-zinc-800">
+                      {(Object.keys(combo.scores) as (keyof GenWeights)[]).map(key => {
+                        const val  = combo.scores[key]
+                        const wPct = weights[key]
+                        return (
+                          <Tip key={key} content={`${WEIGHT_LABELS[key]}: score promedio ${(val * 100).toFixed(0)}% · peso ${wPct}%`}>
+                            <div className="flex flex-col items-center gap-1 cursor-help w-full">
+                              <div className="w-full h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                                <div
+                                  className="h-1.5 rounded-full"
+                                  style={{ width: `${val * 100}%`, background: WEIGHT_COLORS[key] }}
+                                />
+                              </div>
+                              <span className="text-[9px] text-zinc-400 text-center leading-tight">
+                                {WEIGHT_LABELS[key]}
+                              </span>
+                            </div>
+                          </Tip>
+                        )
+                      })}
+                    </div>
+
+                  </div>
+                )
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function ComparativePage() {
@@ -2577,6 +3050,7 @@ export function ComparativePage() {
           <TabsTrigger value="chisq">Chi²</TabsTrigger>
           <TabsTrigger value="arima">ARIMA</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
+          <TabsTrigger value="generador">Generador</TabsTrigger>
         </TabsList>
 
         {/* ── Tab: Consenso ── */}
@@ -2763,6 +3237,20 @@ export function ComparativePage() {
             backtestMap={backtestMap}
             pairsMap={pairsMap}
             arimaNumbers={arimaTopNumbers}
+          />
+        </TabsContent>
+
+        {/* ── Tab: Generador ── */}
+        <TabsContent value="generador">
+          <CombinationGenerator
+            rankedScores={rankedScores}
+            bayesMap={bayesMap}
+            dueMap={dueMap}
+            backtestMap={backtestMap}
+            pairsMap={pairsMap}
+            sumMap={sumMap}
+            arimaForecasts={arimaForecasts}
+            arimaReady={arimaReady}
           />
         </TabsContent>
 
