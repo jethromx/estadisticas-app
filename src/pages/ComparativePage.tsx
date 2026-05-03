@@ -2313,8 +2313,6 @@ function ComparativeSuggestions({
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-const ARIMA_WINDOWS = [50, 100, 150, 200, 250, 300] as const
-
 export function ComparativePage() {
   // Core data — gates the whole page render
   const { data: dueMelate,     isLoading: l1 } = useDueNumbers('MELATE',     56)
