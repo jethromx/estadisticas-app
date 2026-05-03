@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Legend, CartesianGrid, ReferenceLine,
@@ -1033,6 +1033,180 @@ function ChiSquareComparison({
   )
 }
 
+// ── ArimaComparison ───────────────────────────────────────────────────────────
+
+function ArimaComparison({
+  arimaForecasts,
+  arimaReady,
+}: {
+  arimaForecasts: Record<string, Record<number, number>>
+  arimaReady: boolean
+}) {
+  if (!arimaReady) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-300 border-t-violet-600" />
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
+          Calculando pronóstico ARIMA para los 3 juegos…
+        </p>
+        <p className="text-xs text-zinc-400 dark:text-zinc-500">
+          Entrenando modelos AR(1) para cada número en 6 ventanas temporales
+        </p>
+      </div>
+    )
+  }
+
+  // Per-game top-10 by forecast value
+  const perGameTop10 = useMemo(() => {
+    return Object.fromEntries(
+      GAMES.map(g => {
+        const forecasts = arimaForecasts[g] ?? {}
+        const ranked = Array.from({ length: 56 }, (_, i) => i + 1)
+          .map(n => ({ n, v: forecasts[n] ?? 0 }))
+          .sort((a, b) => b.v - a.v)
+          .slice(0, 10)
+        return [g, ranked]
+      }),
+    )
+  }, [arimaForecasts])
+
+  // Combined top-6 balanced (3 odd + 3 even) by average forecast
+  const combinedTop6 = useMemo(() => {
+    const avgForecast: Record<number, number> = {}
+    Array.from({ length: 56 }, (_, i) => i + 1).forEach(num => {
+      const vals = GAMES.map(g => arimaForecasts[g]?.[num] ?? 0)
+      avgForecast[num] = vals.reduce((a, b) => a + b, 0) / GAMES.length
+    })
+    const ranked = Array.from({ length: 56 }, (_, i) => i + 1)
+      .sort((a, b) => (avgForecast[b] ?? 0) - (avgForecast[a] ?? 0))
+    const odd  = ranked.filter(n => n % 2 !== 0).slice(0, 3)
+    const even = ranked.filter(n => n % 2 === 0).slice(0, 3)
+    return { numbers: [...odd, ...even].sort((a, b) => a - b), avgForecast }
+  }, [arimaForecasts])
+
+  // Bar chart data: top-10 per game
+  const barChartData = useMemo(() => {
+    return Array.from({ length: 10 }, (_, i) => {
+      const entry: Record<string, number | string> = { rank: `#${i + 1}` }
+      GAMES.forEach(g => {
+        const item = perGameTop10[g]?.[i]
+        if (item) {
+          entry[`${g}_num`] = item.n
+          entry[g] = Math.max(item.v, 0)
+        }
+      })
+      return entry
+    })
+  }, [perGameTop10])
+
+  const maxForecast = Math.max(
+    ...GAMES.flatMap(g => Object.values(arimaForecasts[g] ?? {}).filter(v => v > 0)),
+    0.01,
+  )
+
+  return (
+    <div className="flex flex-col gap-6">
+
+      {/* Per-game top-10 in 3 columns */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        {GAMES.map(g => (
+          <div key={g} className="flex flex-col gap-1.5">
+            <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300 mb-1">
+              {GAME_ICON[g]} {GAME_LABEL[g]}
+            </p>
+            {(perGameTop10[g] ?? []).map(({ n, v }, rank) => (
+              <div key={n} className="flex items-center gap-2 py-1 border-b border-zinc-50 dark:border-zinc-800/60 last:border-0">
+                <span className="w-4 text-right text-[10px] text-zinc-400 shrink-0">{rank + 1}</span>
+                <span
+                  className="w-8 h-8 shrink-0 flex items-center justify-center rounded-full font-bold text-sm text-white"
+                  style={{ background: GAME_COLOR[g] }}
+                >
+                  {n}
+                </span>
+                <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                  <div className="h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                    <div
+                      className="h-1.5 rounded-full"
+                      style={{
+                        width: `${(Math.max(v, 0) / maxForecast) * 100}%`,
+                        background: GAME_COLOR[g],
+                      }}
+                    />
+                  </div>
+                </div>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tabular-nums shrink-0">
+                  {v.toFixed(3)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {/* Combined top-6 */}
+      <div className="rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 p-4">
+        <p className="text-sm font-semibold text-violet-800 dark:text-violet-300 mb-3">
+          Combinación ARIMA — Top-6 promedio (3 impares + 3 pares)
+        </p>
+        <div className="flex flex-wrap gap-3">
+          {combinedTop6.numbers.map(n => {
+            const avg = combinedTop6.avgForecast[n] ?? 0
+            const norm = avg / maxForecast
+            return (
+              <div key={n} className="flex flex-col items-center gap-1">
+                <span
+                  className="inline-flex h-12 w-12 items-center justify-center rounded-full font-bold text-lg text-white"
+                  style={{
+                    background: norm > 0.75 ? '#7c3aed' : norm > 0.5 ? '#8b5cf6' : '#a78bfa',
+                  }}
+                >
+                  {n}
+                </span>
+                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tabular-nums">
+                  {avg.toFixed(3)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Bar chart of top-10 forecast values per game */}
+      <div>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 mb-2">
+          Pronóstico ARIMA — Top 10 por juego (valor de frecuencia predicha)
+        </p>
+        <ResponsiveContainer width="100%" height={220}>
+          <BarChart data={barChartData} margin={{ top: 4, right: 8, left: -10, bottom: 0 }} barCategoryGap="20%">
+            <CartesianGrid strokeDasharray="3 3" opacity={0.15} />
+            <XAxis dataKey="rank" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} tickFormatter={v => v.toFixed(2)} />
+            <Tooltip
+              formatter={(v: unknown, name: unknown) => [Number(v).toFixed(4), GAME_LABEL[String(name)] ?? String(name)]}
+            />
+            <Legend formatter={name => GAME_LABEL[name] ?? name} />
+            {GAMES.map(g => (
+              <Bar key={g} dataKey={g} name={g} fill={GAME_COLOR[g]} radius={[3, 3, 0, 0]} />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Methodology note */}
+      <div className="rounded-lg border border-dashed border-zinc-200 dark:border-zinc-700 p-3">
+        <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+          <b className="text-zinc-600 dark:text-zinc-300">ARIMA(1,0,0) — Modelo autorregresivo:</b>{' '}
+          Se entrena un modelo AR(1) para cada número usando 6 ventanas de sorteos (50, 100, 150, 200, 250, 300 sorteos).
+          La serie temporal es la frecuencia incremental entre ventanas consecutivas.
+          El pronóstico predice la frecuencia incremental en el siguiente período.
+          Un valor positivo indica que el número tiende a aparecer con mayor frecuencia conforme avanza la ventana.
+        </p>
+      </div>
+
+    </div>
+  )
+}
+
 // ── ComparativeSuggestions ────────────────────────────────────────────────────
 
 function ComparativeSuggestions({
@@ -1043,14 +1217,16 @@ function ComparativeSuggestions({
   chiMap,
   backtestMap,
   pairsMap,
+  arimaNumbers,
 }: {
-  rankedScores: NumberScore[]
-  bayesMap:     Record<string, BayesianNumber[] | undefined>
-  balMap:       Record<string, BalanceAnalysis | undefined>
-  sumMap:       Record<string, SumDistribution | undefined>
-  chiMap:       Record<string, ChiSquareResult | undefined>
-  backtestMap:  Record<string, BacktestResult | undefined>
-  pairsMap:     Record<string, NumberPair[] | undefined>
+  rankedScores:  NumberScore[]
+  bayesMap:      Record<string, BayesianNumber[] | undefined>
+  balMap:        Record<string, BalanceAnalysis | undefined>
+  sumMap:        Record<string, SumDistribution | undefined>
+  chiMap:        Record<string, ChiSquareResult | undefined>
+  backtestMap:   Record<string, BacktestResult | undefined>
+  pairsMap:      Record<string, NumberPair[] | undefined>
+  arimaNumbers?: number[]
 }) {
   const bayesLookup = useMemo(() => {
     const lk: Record<string, Record<number, BayesianNumber>> = {}
@@ -1186,8 +1362,13 @@ function ComparativeSuggestions({
       .map(r => r.num)
     rows.push({ label: 'Co-ocurrencia', numbers: balanced6(pairRanked), color: '#10b981' })
 
+    // ARIMA row
+    if (arimaNumbers?.length) {
+      rows.push({ label: 'ARIMA', numbers: arimaNumbers, color: '#8b5cf6' })
+    }
+
     return rows
-  }, [selectedNums, rankedScores, bayesLookup, backtestMap, pairsMap])
+  }, [selectedNums, rankedScores, bayesLookup, backtestMap, pairsMap, arimaNumbers])
 
   // Count how many analyses suggest each number
   const coincidenceMap = useMemo(() => {
@@ -1395,6 +1576,15 @@ function ComparativeSuggestions({
       },
     ]
   }, [conclusionCombos])
+
+  // Mega vote map combining ALL sources
+  const megaVoteMap = useMemo(() => {
+    const mv: Record<number, number> = {}
+    analysisRows.forEach(r => r.numbers.forEach(n => { mv[n] = (mv[n] ?? 0) + 1 }))
+    conclusionCombos.forEach(r => r.numbers.forEach(n => { mv[n] = (mv[n] ?? 0) + 1 }))
+    derivedCombos.forEach(r => r.numbers.forEach(n => { mv[n] = (mv[n] ?? 0) + 1 }))
+    return mv
+  }, [analysisRows, conclusionCombos, derivedCombos])
 
   return (
     <div className="flex flex-col gap-6">
@@ -1947,11 +2137,108 @@ function ComparativeSuggestions({
         </CardContent>
       </Card>
 
+      {/* ── Mejores Propuestas ── */}
+      {(() => {
+        const totalSources = analysisRows.length + 5 + derivedCombos.length
+        const topVoted = Array.from({ length: 56 }, (_, i) => i + 1)
+          .sort((a, b) => (megaVoteMap[b] ?? 0) - (megaVoteMap[a] ?? 0))
+        const maxVotes = megaVoteMap[topVoted[0]] ?? 1
+
+        function pickMejor(nOdd: number, nEven: number): number[] {
+          const odd  = topVoted.filter(n => n % 2 !== 0)
+          const even = topVoted.filter(n => n % 2 === 0)
+          return [...odd.slice(0, nOdd), ...even.slice(0, nEven)].sort((a, b) => a - b)
+        }
+
+        const propuestas = [
+          { title: '3I + 3P', desc: 'Balance estándar — 3 impares + 3 pares', numbers: pickMejor(3, 3) },
+          { title: '4I + 2P', desc: 'Priorizando impares',                     numbers: pickMejor(4, 2) },
+          { title: '2I + 4P', desc: 'Priorizando pares',                       numbers: pickMejor(2, 4) },
+        ]
+
+        const opt = GAMES.map(g => sumMap[g]).filter(Boolean) as SumDistribution[]
+        const sMin = opt.length ? Math.max(...opt.map(d => d.optimalMin)) : 0
+        const sMax = opt.length ? Math.min(...opt.map(d => d.optimalMax)) : 999
+
+        return (
+          <Card className="border-2 border-amber-300 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-900/10">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-amber-800 dark:text-amber-300">
+                🏆 Mejores Propuestas
+              </CardTitle>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Síntesis final — números respaldados por la mayor cantidad de análisis y combinaciones.
+                Se consideraron <b className="text-zinc-700 dark:text-zinc-200">{totalSources} listas</b> en total
+                ({analysisRows.length} métodos · 5 combinaciones · {derivedCombos.length} derivadas).
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-4">
+                {propuestas.map(prop => {
+                  const sum  = prop.numbers.reduce((a, b) => a + b, 0)
+                  const inR  = sum >= sMin && sum <= sMax
+                  const oddC = prop.numbers.filter(n => n % 2 !== 0).length
+                  const evnC = prop.numbers.length - oddC
+                  return (
+                    <div key={prop.title} className="rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <div>
+                          <p className="text-sm font-bold text-zinc-800 dark:text-zinc-100">{prop.title}</p>
+                          <p className="text-xs text-zinc-500 dark:text-zinc-400">{prop.desc}</p>
+                        </div>
+                        <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
+                          <Tip content={`Suma total. Rango óptimo: ${sMin}–${sMax}`}>
+                            <p className={cn('text-sm font-bold tabular-nums cursor-help', inR ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
+                              Σ {sum}
+                            </p>
+                          </Tip>
+                          <p className="text-[10px] text-zinc-400">{oddC}I · {evnC}P</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {prop.numbers.map(n => {
+                          const votes = megaVoteMap[n] ?? 0
+                          const norm  = votes / maxVotes
+                          return (
+                            <Tip key={n} content={`Nº${n} — respaldado por ${votes} de ${totalSources} listas`}>
+                              <div className="flex flex-col items-center gap-0.5">
+                                <span
+                                  className={cn(
+                                    'inline-flex h-12 w-12 items-center justify-center rounded-full font-bold text-lg text-white cursor-help shadow-sm',
+                                    norm > 0.75 ? 'ring-4 ring-amber-400 ring-offset-2 dark:ring-offset-zinc-900'
+                                    : norm > 0.5 ? 'ring-2 ring-violet-400 ring-offset-1 dark:ring-offset-zinc-900'
+                                    : '',
+                                  )}
+                                  style={{
+                                    background: norm > 0.75 ? '#f59e0b' : norm > 0.5 ? '#7c3aed' : '#8b5cf6',
+                                  }}
+                                >
+                                  {n}
+                                </span>
+                                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tabular-nums">
+                                  {votes}/{totalSources}
+                                </span>
+                              </div>
+                            </Tip>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </CardContent>
+          </Card>
+        )
+      })()}
+
     </div>
   )
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+
+const ARIMA_WINDOWS = [50, 100, 150, 200, 250, 300] as const
 
 export function ComparativePage() {
   // Core data — gates the whole page render
@@ -1962,6 +2249,109 @@ export function ComparativePage() {
   const { data: wfMelate,      isLoading: l4 } = useWindowedFrequencies('MELATE',     100)
   const { data: wfRevancha,    isLoading: l5 } = useWindowedFrequencies('REVANCHA',   100)
   const { data: wfRevanchita,  isLoading: l6 } = useWindowedFrequencies('REVANCHITA', 100)
+
+  // ARIMA windows (100 already fetched above; reuse wfMelate/wfRevancha/wfRevanchita for w=100)
+  const { data: wf50Melate      } = useWindowedFrequencies('MELATE',       50)
+  const { data: wf150Melate     } = useWindowedFrequencies('MELATE',      150)
+  const { data: wf200Melate     } = useWindowedFrequencies('MELATE',      200)
+  const { data: wf250Melate     } = useWindowedFrequencies('MELATE',      250)
+  const { data: wf300Melate     } = useWindowedFrequencies('MELATE',      300)
+  const { data: wf50Revancha    } = useWindowedFrequencies('REVANCHA',     50)
+  const { data: wf150Revancha   } = useWindowedFrequencies('REVANCHA',    150)
+  const { data: wf200Revancha   } = useWindowedFrequencies('REVANCHA',    200)
+  const { data: wf250Revancha   } = useWindowedFrequencies('REVANCHA',    250)
+  const { data: wf300Revancha   } = useWindowedFrequencies('REVANCHA',    300)
+  const { data: wf50Revanchita  } = useWindowedFrequencies('REVANCHITA',   50)
+  const { data: wf150Revanchita } = useWindowedFrequencies('REVANCHITA',  150)
+  const { data: wf200Revanchita } = useWindowedFrequencies('REVANCHITA',  200)
+  const { data: wf250Revanchita } = useWindowedFrequencies('REVANCHITA',  250)
+  const { data: wf300Revanchita } = useWindowedFrequencies('REVANCHITA',  300)
+
+  // ARIMA state
+  const [arimaForecasts, setArimaForecasts] = useState<Record<string, Record<number, number>>>({})
+  const [arimaReady, setArimaReady] = useState(false)
+
+  useEffect(() => {
+    // All 18 window arrays must be loaded (w=100 reuses existing wfMelate etc.)
+    if (
+      !wf50Melate || !wfMelate || !wf150Melate || !wf200Melate || !wf250Melate || !wf300Melate ||
+      !wf50Revancha || !wfRevancha || !wf150Revancha || !wf200Revancha || !wf250Revancha || !wf300Revancha ||
+      !wf50Revanchita || !wfRevanchita || !wf150Revanchita || !wf200Revanchita || !wf250Revanchita || !wf300Revanchita
+    ) return
+
+    const windowedDataByGame: Record<string, Record<number, WindowedFrequency[]>> = {
+      MELATE: {
+        50:  wf50Melate,
+        100: wfMelate,
+        150: wf150Melate,
+        200: wf200Melate,
+        250: wf250Melate,
+        300: wf300Melate,
+      },
+      REVANCHA: {
+        50:  wf50Revancha,
+        100: wfRevancha,
+        150: wf150Revancha,
+        200: wf200Revancha,
+        250: wf250Revancha,
+        300: wf300Revancha,
+      },
+      REVANCHITA: {
+        50:  wf50Revanchita,
+        100: wfRevanchita,
+        150: wf150Revanchita,
+        200: wf200Revanchita,
+        250: wf250Revanchita,
+        300: wf300Revanchita,
+      },
+    }
+
+    let cancelled = false
+
+    async function runArima() {
+      const arimaModule = await import('arima/async')
+      const ARIMA = await arimaModule.default
+      const result: Record<string, Record<number, number>> = {}
+
+      for (const game of GAMES) {
+        result[game] = {}
+        const byWindow = windowedDataByGame[game]
+        for (let num = 1; num <= 56; num++) {
+          // Build time series of incremental frequencies across the 6 windows
+          const freqAt = (w: number) => byWindow[w]?.find(wf => wf.number === num)?.frequency ?? 0
+          const ts: number[] = [
+            freqAt(50),
+            freqAt(100) - freqAt(50),
+            freqAt(150) - freqAt(100),
+            freqAt(200) - freqAt(150),
+            freqAt(250) - freqAt(200),
+            freqAt(300) - freqAt(250),
+          ]
+          try {
+            const model = new ARIMA({ p: 1, d: 0, q: 0, verbose: false })
+            model.train(ts)
+            const [forecast] = model.predict(1)
+            model.destroy()
+            result[game][num] = forecast
+          } catch {
+            result[game][num] = 0
+          }
+        }
+      }
+
+      if (!cancelled) {
+        setArimaForecasts(result)
+        setArimaReady(true)
+      }
+    }
+
+    runArima()
+    return () => { cancelled = true }
+  }, [
+    wf50Melate, wfMelate, wf150Melate, wf200Melate, wf250Melate, wf300Melate,
+    wf50Revancha, wfRevancha, wf150Revancha, wf200Revancha, wf250Revancha, wf300Revancha,
+    wf50Revanchita, wfRevanchita, wf150Revanchita, wf200Revanchita, wf250Revanchita, wf300Revanchita,
+  ])
 
   // Distribucion tab data (loads independently)
   const { data: balMelate     } = useBalanceAnalysis('MELATE')
@@ -2060,6 +2450,21 @@ export function ComparativePage() {
     [rankedScores],
   )
 
+  // ARIMA top-6 balanced for ComparativeSuggestions
+  const arimaTopNumbers = useMemo(() => {
+    if (Object.keys(arimaForecasts).length === 0) return []
+    const avgForecast: Record<number, number> = {}
+    Array.from({ length: 56 }, (_, i) => i + 1).forEach(num => {
+      const vals = GAMES.map(g => arimaForecasts[g]?.[num] ?? 0)
+      avgForecast[num] = vals.reduce((a, b) => a + b, 0) / GAMES.length
+    })
+    const ranked = Array.from({ length: 56 }, (_, i) => i + 1)
+      .sort((a, b) => (avgForecast[b] ?? 0) - (avgForecast[a] ?? 0))
+    const odd  = ranked.filter(n => n % 2 !== 0).slice(0, 3)
+    const even = ranked.filter(n => n % 2 === 0).slice(0, 3)
+    return [...odd, ...even].sort((a, b) => a - b)
+  }, [arimaForecasts])
+
   if (loading) return <PageSpinner />
 
   if (!hasData) {
@@ -2097,6 +2502,7 @@ export function ComparativePage() {
           <TabsTrigger value="bayesiano">Bayesiano</TabsTrigger>
           <TabsTrigger value="backtest">Backtest</TabsTrigger>
           <TabsTrigger value="chisq">Chi²</TabsTrigger>
+          <TabsTrigger value="arima">ARIMA</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
         </TabsList>
 
@@ -2257,6 +2663,22 @@ export function ComparativePage() {
           </Card>
         </TabsContent>
 
+        {/* ── Tab: ARIMA ── */}
+        <TabsContent value="arima">
+          <Card>
+            <CardHeader>
+              <CardTitle>Pronóstico ARIMA — Frecuencia por período</CardTitle>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Modelo autorregresivo AR(1) entrenado sobre la frecuencia incremental de cada número
+                en 6 ventanas de sorteos (50 → 300). Predice la tendencia en el siguiente período.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <ArimaComparison arimaForecasts={arimaForecasts} arimaReady={arimaReady} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         {/* ── Tab: Sugerencias ── */}
         <TabsContent value="sugerencias">
           <ComparativeSuggestions
@@ -2267,6 +2689,7 @@ export function ComparativePage() {
             chiMap={chiMap}
             backtestMap={backtestMap}
             pairsMap={pairsMap}
+            arimaNumbers={arimaTopNumbers}
           />
         </TabsContent>
 
