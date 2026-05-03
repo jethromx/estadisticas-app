@@ -1363,10 +1363,12 @@ function ComparativeSuggestions({
       .map(r => r.num)
     rows.push({ label: 'Co-ocurrencia', numbers: balanced6(pairRanked), color: '#10b981' })
 
-    // ARIMA row
-    if (arimaNumbers?.length) {
-      rows.push({ label: 'ARIMA', numbers: arimaNumbers, color: '#8b5cf6' })
-    }
+    // Tendencia row — always present; shows top numbers by linear trend forecast
+    rows.push({
+      label: 'Tendencia',
+      numbers: arimaNumbers?.length ? arimaNumbers : balanced6(rankedScores.map(s => s.number)),
+      color: '#8b5cf6',
+    })
 
     return rows
   }, [selectedNums, rankedScores, bayesLookup, backtestMap, pairsMap, arimaNumbers])
@@ -1527,8 +1529,16 @@ function ComparativeSuggestions({
         numbers: combo5,
         color: '#10b981',
       },
+      {
+        title: 'Tendencia Creciente',
+        desc:  'Números con frecuencia en ascenso en los últimos 300 sorteos (extrapolación lineal)',
+        numbers: arimaNumbers?.length
+          ? arimaNumbers
+          : balanced6(rankedScores.map(s => s.number), sumOpt),
+        color: '#8b5cf6',
+      },
     ]
-  }, [coincidenceMap, bayesMap, rankedScores, bayesLookup, sumMap, pairsMap, analysisRows, backtestMap])
+  }, [coincidenceMap, bayesMap, rankedScores, bayesLookup, sumMap, pairsMap, analysisRows, backtestMap, arimaNumbers])
 
   // Combinations derived from numbers repeated across the 5 conclusionCombos
   const derivedCombos = useMemo(() => {
