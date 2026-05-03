@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react'
+import arimaPromise from 'arima/async'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Legend, CartesianGrid, ReferenceLine,
@@ -2308,31 +2309,30 @@ export function ComparativePage() {
 
     let cancelled = false
 
-    async function runArima() {
-      const arimaModule = await import('arima/async')
-      const ARIMA = await arimaModule.default
+    arimaPromise.then(ARIMA => {
+      if (cancelled) return
       const result: Record<string, Record<number, number>> = {}
 
       for (const game of GAMES) {
         result[game] = {}
         const byWindow = windowedDataByGame[game]
         for (let num = 1; num <= 56; num++) {
-          // Build time series of incremental frequencies across the 6 windows
           const freqAt = (w: number) => byWindow[w]?.find(wf => wf.number === num)?.frequency ?? 0
+          // Oldest → most recent so ARIMA sees trend direction correctly
           const ts: number[] = [
-            freqAt(50),
-            freqAt(100) - freqAt(50),
-            freqAt(150) - freqAt(100),
-            freqAt(200) - freqAt(150),
-            freqAt(250) - freqAt(200),
             freqAt(300) - freqAt(250),
-          ]
+            freqAt(250) - freqAt(200),
+            freqAt(200) - freqAt(150),
+            freqAt(150) - freqAt(100),
+            freqAt(100) - freqAt(50),
+            freqAt(50),
+          ].map(v => Math.max(v, 0))
           try {
             const model = new ARIMA({ p: 1, d: 0, q: 0, verbose: false })
             model.train(ts)
-            const [forecast] = model.predict(1)
+            const [forecasts] = model.predict(1)
             model.destroy()
-            result[game][num] = forecast
+            result[game][num] = Math.max(forecasts[0], 0)
           } catch {
             result[game][num] = 0
           }
@@ -2343,9 +2343,10 @@ export function ComparativePage() {
         setArimaForecasts(result)
         setArimaReady(true)
       }
-    }
-
-    runArima()
+    }).catch(e => {
+      console.error('ARIMA WASM failed to load:', e)
+      if (!cancelled) setArimaReady(true)
+    })
     return () => { cancelled = true }
   }, [
     wf50Melate, wfMelate, wf150Melate, wf200Melate, wf250Melate, wf300Melate,
