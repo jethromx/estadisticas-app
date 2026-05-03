@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.7",
+    "arima": "^0.2.8",
     "clsx": "^2.1.1",
     "lucide-react": "^1.14.0",
     "react": "^19.2.5",
