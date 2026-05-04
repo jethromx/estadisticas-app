@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { authApi } from '@/api/auth'
-import type { CreateUserRequest } from '@/types/auth'
+import { useAuth } from '@/contexts/AuthContext'
+import type { AdminUser, CreateUserRequest, UpdateUserRequest } from '@/types/auth'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -72,6 +73,7 @@ function MetricsTab() {
 }
 
 function UsersTab() {
+  const { isAdmin } = useAuth()
   const queryClient = useQueryClient()
   const { data, isLoading, error } = useQuery({
     queryKey: ['admin', 'users'],
@@ -86,6 +88,14 @@ function UsersTab() {
     email: '',
     password: '',
     role: 'USER',
+  })
+
+  const [editingUser, setEditingUser] = useState<AdminUser | null>(null)
+  const [editForm, setEditForm] = useState<UpdateUserRequest>({
+    username: '',
+    email: '',
+    role: 'USER',
+    active: true,
   })
 
   async function handleCreate(e: React.FormEvent) {
@@ -104,8 +114,55 @@ function UsersTab() {
     }
   }
 
+  async function handleEdit(user: AdminUser) {
+    setEditingUser(user)
+    setEditForm({
+      username: user.username,
+      email: user.email,
+      role: user.role,
+      active: user.active,
+    })
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!editingUser) return
+
+    setFormError(null)
+    setFormLoading(true)
+    try {
+      await authApi.updateUser(editingUser.id, editForm)
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      setEditingUser(null)
+      setEditForm({ username: '', email: '', role: 'USER', active: true })
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Error al actualizar usuario'
+      console.error('Update error:', message, err)
+      setFormError(message)
+    } finally {
+      setFormLoading(false)
+    }
+  }
+
+  async function handleDelete(id: string, username: string) {
+    if (!confirm(`¿Estás seguro de que quieres eliminar al usuario "${username}"? Esta acción no se puede deshacer.`)) {
+      return
+    }
+
+    try {
+      await authApi.deleteUser(id)
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+    } catch (err) {
+      alert(`Error al eliminar usuario: ${err instanceof Error ? err.message : 'Error desconocido'}`)
+    }
+  }
+
   if (isLoading) return <PageSpinner />
   if (error || !data) return <p className="text-sm text-red-500">Error al cargar usuarios.</p>
+
+  if (!isAdmin) {
+    return <p className="text-sm text-amber-600 dark:text-amber-400">No tienes permisos para gestionar usuarios. Solo admins pueden acceder a esta sección.</p>
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -190,6 +247,84 @@ function UsersTab() {
         </Card>
       )}
 
+      {editingUser && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Editar usuario: {editingUser.username}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleUpdate} className="flex flex-col gap-3">
+              {formError && (
+                <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700 dark:bg-red-900/20 dark:text-red-400">
+                  {formError}
+                </p>
+              )}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Usuario</label>
+                  <input
+                    required
+                    value={editForm.username}
+                    onChange={e => setEditForm(f => ({ ...f, username: e.target.value }))}
+                    placeholder="usuario"
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Email</label>
+                  <input
+                    required
+                    type="email"
+                    value={editForm.email}
+                    onChange={e => setEditForm(f => ({ ...f, email: e.target.value }))}
+                    placeholder="correo@ejemplo.com"
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Rol</label>
+                  <select
+                    value={editForm.role}
+                    onChange={e => setEditForm(f => ({ ...f, role: e.target.value }))}
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  >
+                    <option value="USER">USER</option>
+                    <option value="ADMIN">ADMIN</option>
+                  </select>
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Estado</label>
+                  <select
+                    value={editForm.active ? 'true' : 'false'}
+                    onChange={e => setEditForm(f => ({ ...f, active: e.target.value === 'true' }))}
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  >
+                    <option value="true">Activo</option>
+                    <option value="false">Inactivo</option>
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingUser(null)}
+                  className="rounded-lg border border-zinc-200 bg-white px-4 py-2 text-sm font-medium text-zinc-700 transition-colors hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 dark:hover:bg-zinc-700"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={formLoading}
+                  className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-violet-700 disabled:opacity-60"
+                >
+                  {formLoading ? 'Actualizando…' : 'Actualizar'}
+                </button>
+              </div>
+            </form>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -200,6 +335,7 @@ function UsersTab() {
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Rol</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Estado</th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Creado</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
@@ -223,6 +359,22 @@ function UsersTab() {
                       month: 'short',
                       day: 'numeric',
                     })}
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEdit(u)}
+                        className="rounded px-2 py-1 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        onClick={() => handleDelete(u.id, u.username)}
+                        className="rounded px-2 py-1 text-xs font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
+                      >
+                        Eliminar
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}
