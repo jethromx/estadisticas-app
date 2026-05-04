@@ -61,3 +61,10 @@ export interface CreateUserRequest {
   password: string
   role: string
 }
+
+export interface UpdateUserRequest {
+  username: string
+  email: string
+  role: string
+  active: boolean
+}

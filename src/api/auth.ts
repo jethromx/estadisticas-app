@@ -6,6 +6,7 @@ import type {
   CreateUserRequest,
   LoginRequest,
   RegisterRequest,
+  UpdateUserRequest,
 } from '@/types/auth'
 
 const BASE = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1`
@@ -25,6 +26,14 @@ async function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
     },
   })
   if (!res.ok) {
+    // Handle specific HTTP status codes
+    if (res.status === 403) {
+      throw new Error('No tienes permisos para realizar esta acción. Solo admins pueden gestionar usuarios.')
+    }
+    if (res.status === 401) {
+      throw new Error('Tu sesión ha expirado. Por favor inicia sesión de nuevo.')
+    }
+    
     const err = await res.json().catch(() => ({ message: res.statusText }))
     throw new Error((err as { message?: string }).message ?? 'Error')
   }
@@ -43,6 +52,12 @@ export const authApi = {
 
   createUser: (body: CreateUserRequest) =>
     authRequest<AdminUser>('/admin/users', { method: 'POST', body: JSON.stringify(body) }),
+
+  updateUser: (id: string, body: UpdateUserRequest) =>
+    authRequest<AdminUser>(`/admin/users/${id}`, { method: 'PUT', body: JSON.stringify(body) }),
+
+  deleteUser: (id: string) =>
+    authRequest<void>(`/admin/users/${id}`, { method: 'DELETE' }),
 
   getMetrics: () =>
     authRequest<AdminMetrics>('/admin/metrics'),
