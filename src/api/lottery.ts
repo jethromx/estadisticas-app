@@ -22,7 +22,14 @@ const BASE        = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/lottery`
 const PRED_BASE   = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/predictions`
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${BASE}${path}`, options)
+  const token = localStorage.getItem('lottery_token')
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
+  })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }))
     throw new Error((err as { message?: string }).message ?? 'Error en la solicitud')
@@ -91,7 +98,14 @@ export const api = {
 }
 
 async function predRequest<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${PRED_BASE}${path}`, options)
+  const token = localStorage.getItem('lottery_token')
+  const res = await fetch(`${PRED_BASE}${path}`, {
+    ...options,
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...options?.headers,
+    },
+  })
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: res.statusText }))
     throw new Error((err as { message?: string }).message ?? 'Error en la solicitud')

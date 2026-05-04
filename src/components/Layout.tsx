@@ -1,6 +1,8 @@
 import { NavLink, Outlet } from 'react-router-dom'
+import { LogOut, Shield } from 'lucide-react'
 import { cn, LOTTERY_TYPES } from '@/lib/utils'
 import type { LotteryTypeMeta } from '@/types/lottery'
+import { useAuth } from '@/contexts/AuthContext'
 
 function NavItem({ meta }: { meta: LotteryTypeMeta }) {
   return (
@@ -22,6 +24,8 @@ function NavItem({ meta }: { meta: LotteryTypeMeta }) {
 }
 
 export function Layout() {
+  const { user, logout, isAdmin } = useAuth()
+
   return (
     <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
       {/* Sidebar */}
@@ -61,6 +65,22 @@ export function Layout() {
             <span className="text-lg">🔍</span>
             <span>Comparativo</span>
           </NavLink>
+          {isAdmin && (
+            <NavLink
+              to="/admin"
+              className={({ isActive }) =>
+                cn(
+                  'flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors',
+                  isActive
+                    ? 'bg-violet-50 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300'
+                    : 'text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100',
+                )
+              }
+            >
+              <Shield className="h-[18px] w-[18px]" />
+              <span>Admin</span>
+            </NavLink>
+          )}
           <div className="my-2 h-px bg-zinc-100 dark:bg-zinc-800" />
           <p className="px-3 pb-1 text-xs font-medium uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
             Juegos
@@ -69,6 +89,20 @@ export function Layout() {
             <NavItem key={meta.id} meta={meta} />
           ))}
         </nav>
+
+        {/* Logout section */}
+        <div className="mt-auto border-t border-zinc-200 dark:border-zinc-800 p-3">
+          <div className="flex items-center gap-2 px-3 py-2 text-xs text-zinc-500">
+            <span className="truncate">{user?.username}</span>
+          </div>
+          <button
+            onClick={logout}
+            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Cerrar sesión</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main */}
@@ -115,6 +149,22 @@ export function Layout() {
           <span className="text-base">🔍</span>
           <span>Comp.</span>
         </NavLink>
+        {isAdmin && (
+          <NavLink
+            to="/admin"
+            className={({ isActive }) =>
+              cn(
+                'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium transition-colors',
+                isActive
+                  ? 'text-violet-700 dark:text-violet-300'
+                  : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-zinc-100',
+              )
+            }
+          >
+            <Shield className="h-4 w-4" />
+            <span>Admin</span>
+          </NavLink>
+        )}
         {LOTTERY_TYPES.map(meta => (
           <NavLink
             key={meta.id}
