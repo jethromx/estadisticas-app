@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Legend, CartesianGrid, ReferenceLine,
@@ -770,11 +770,11 @@ function BayesianComparison({
                 {GAMES.map(g => {
                   const b = byGame[g][num]
                   return (
-                    <>
-                      <td key={`${g}-post`} className="py-2 pr-3 text-zinc-700 dark:text-zinc-300 tabular-nums text-xs">
+                    <Fragment key={g}>
+                      <td className="py-2 pr-3 text-zinc-700 dark:text-zinc-300 tabular-nums text-xs">
                         {b ? b.posteriorMean.toFixed(4) : '–'}
                       </td>
-                      <td key={`${g}-lift`} className={cn(
+                      <td className={cn(
                         'py-2 pr-3 tabular-nums text-xs font-semibold',
                         !b ? 'text-zinc-400'
                         : b.lift > 0 ? 'text-emerald-600 dark:text-emerald-400'
@@ -782,7 +782,7 @@ function BayesianComparison({
                       )}>
                         {b ? `${b.lift > 0 ? '+' : ''}${b.lift.toFixed(2)}` : '–'}
                       </td>
-                    </>
+                    </Fragment>
                   )
                 })}
               </tr>
