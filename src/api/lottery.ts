@@ -14,9 +14,12 @@ import type {
   ChiSquareResult,
   BacktestResult,
   BayesianNumber,
+  SavedPredictionSet,
+  SavePredictionRequest,
 } from '@/types/lottery'
 
-const BASE = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/lottery`
+const BASE        = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/lottery`
+const PRED_BASE   = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/predictions`
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${BASE}${path}`, options)
@@ -85,4 +88,29 @@ export const api = {
 
   draws: (type: LotteryTypeId, limit = 5000) =>
     request<DrawResult[]>(`/${type}/draws?limit=${limit}`),
+}
+
+async function predRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(`${PRED_BASE}${path}`, options)
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: res.statusText }))
+    throw new Error((err as { message?: string }).message ?? 'Error en la solicitud')
+  }
+  if (res.status === 204) return undefined as T
+  return res.json() as Promise<T>
+}
+
+export const predictionsApi = {
+  getAll: () =>
+    predRequest<SavedPredictionSet[]>(''),
+
+  save: (body: SavePredictionRequest) =>
+    predRequest<SavedPredictionSet>('', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body:    JSON.stringify(body),
+    }),
+
+  delete: (id: string) =>
+    predRequest<void>(`/${id}`, { method: 'DELETE' }),
 }

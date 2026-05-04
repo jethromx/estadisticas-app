@@ -145,3 +145,34 @@ export interface SyncResult {
   message: string
   syncedAt: string
 }
+
+export interface GenWeights {
+  due:       number
+  bayes:     number
+  arima:     number
+  backtest:  number
+  pairs:     number
+  consensus: number
+}
+
+export interface GeneratedCombo {
+  numbers:  number[]
+  sum:      number
+  inRange:  boolean
+  wasDrawn: boolean
+  scores:   GenWeights
+}
+
+export interface SavedPredictionSet {
+  id:             string
+  label:          string
+  savedAt:        string        // ISO datetime string
+  latestDrawDate: string | null
+  combos:         GeneratedCombo[]
+}
+
+export interface SavePredictionRequest {
+  label:          string
+  latestDrawDate: string | null
+  combos:         GeneratedCombo[]
+}

@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { api } from './lottery'
-import type { LotteryTypeId, SyncResult } from '@/types/lottery'
+import { api, predictionsApi } from './lottery'
+import type { LotteryTypeId, SyncResult, SavePredictionRequest } from '@/types/lottery'
 
 
 export const keys = {
@@ -147,5 +147,28 @@ export function useSync(type: LotteryTypeId | 'ALL') {
   return useMutation<SyncResult | SyncResult[]>({
     mutationFn: () => type === 'ALL' ? api.syncAll() : api.sync(type),
     onSuccess:  () => qc.invalidateQueries(),
+  })
+}
+
+export function useSavedPredictions() {
+  return useQuery({
+    queryKey: ['savedPredictions'],
+    queryFn:  () => predictionsApi.getAll(),
+  })
+}
+
+export function useSavePrediction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: SavePredictionRequest) => predictionsApi.save(body),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['savedPredictions'] }),
+  })
+}
+
+export function useDeletePrediction() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => predictionsApi.delete(id),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['savedPredictions'] }),
   })
 }

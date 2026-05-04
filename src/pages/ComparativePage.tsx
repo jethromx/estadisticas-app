@@ -8,7 +8,7 @@ import {
   useDueNumbers, useWindowedFrequencies,
   useBalanceAnalysis, useSumDistribution,
   usePairAnalysis, useChiSquare, useBacktest, useBayesianAnalysis,
-  useDrawResults,
+  useDrawResults, useSavedPredictions, useSavePrediction, useDeletePrediction,
 } from '@/api/queries'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,6 +19,7 @@ import { cn, formatNumber } from '@/lib/utils'
 import type {
   LotteryTypeId, DueNumber, DrawResult, WindowedFrequency, BalanceAnalysis, SumDistribution,
   NumberPair, ChiSquareResult, BacktestResult, BayesianNumber,
+  GenWeights, GeneratedCombo, SavedPredictionSet,
 } from '@/types/lottery'
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -2323,31 +2324,7 @@ function ComparativeSuggestions({
 }
 
 // ── CombinationGenerator ──────────────────────────────────────────────────────
-
-interface GenWeights {
-  due:       number
-  bayes:     number
-  arima:     number
-  backtest:  number
-  pairs:     number
-  consensus: number
-}
-
-interface GeneratedCombo {
-  numbers:      number[]
-  sum:          number
-  inRange:      boolean
-  wasDrawn:     boolean
-  scores:       { due: number; bayes: number; arima: number; backtest: number; pairs: number; consensus: number }
-}
-
-interface SavedComboSet {
-  id:              string
-  label:           string
-  savedAt:         string       // ISO datetime
-  latestDrawDate:  string | null // most recent draw date known at save time
-  combos:          GeneratedCombo[]
-}
+// GenWeights, GeneratedCombo, SavedPredictionSet are imported from @/types/lottery
 
 const WEIGHT_LABELS: Record<keyof GenWeights, string> = {
   due: 'Por salir', bayes: 'Bayesiano', arima: 'ARIMA',
@@ -2381,16 +2358,11 @@ function CombinationGenerator({
   const [excludeDrawn,   setExcludeDrawn]   = useState(true)
   const [results,        setResults]        = useState<GeneratedCombo[]>([])
   const [generated,      setGenerated]      = useState(false)
-  const [savedSets,      setSavedSets]      = useState<SavedComboSet[]>(() => {
-    try { return JSON.parse(localStorage.getItem('lottery_saved_combos') ?? '[]') as SavedComboSet[] }
-    catch { return [] }
-  })
   const [expandedSetId,  setExpandedSetId]  = useState<string | null>(null)
 
-  function persistSets(sets: SavedComboSet[]) {
-    setSavedSets(sets)
-    localStorage.setItem('lottery_saved_combos', JSON.stringify(sets))
-  }
+  const { data: savedSets = [] }   = useSavedPredictions()
+  const saveMutation               = useSavePrediction()
+  const deleteMutation             = useDeletePrediction()
 
   function saveCurrentResults() {
     if (!results.length) return
@@ -2399,19 +2371,18 @@ function CombinationGenerator({
       .map(d => d.drawDate)
       .sort()
       .at(-1) ?? null
-    const newSet: SavedComboSet = {
-      id:   Date.now().toString(),
-      label: `Predicción ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}`,
-      savedAt: new Date().toISOString(),
-      latestDrawDate,
-      combos: results,
-    }
-    persistSets([newSet, ...savedSets])
-    setExpandedSetId(newSet.id)
+    saveMutation.mutate(
+      {
+        label: `Predicción ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}`,
+        latestDrawDate,
+        combos: results,
+      },
+      { onSuccess: (saved: SavedPredictionSet) => setExpandedSetId(saved.id) },
+    )
   }
 
   function deleteSet(id: string) {
-    persistSets(savedSets.filter(s => s.id !== id))
+    deleteMutation.mutate(id)
     if (expandedSetId === id) setExpandedSetId(null)
   }
 
