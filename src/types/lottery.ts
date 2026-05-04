@@ -130,6 +130,12 @@ export interface BayesianNumber {
   lift: number
 }
 
+export interface DrawResult {
+  drawNumber: number
+  drawDate:   string
+  numbers:    number[]
+}
+
 export interface SyncResult {
   lotteryType: LotteryTypeId
   totalRecords: number

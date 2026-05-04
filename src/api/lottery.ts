@@ -5,6 +5,7 @@ import type {
   PatternSuggestion,
   SyncResult,
   DueNumber,
+  DrawResult,
   Methodology,
   WindowedFrequency,
   BalanceAnalysis,
@@ -81,4 +82,7 @@ export const api = {
 
   bayesianAnalysis: (type: LotteryTypeId, recentWindow = 50) =>
     request<BayesianNumber[]>(`/${type}/bayesian-analysis?recentWindow=${recentWindow}`),
+
+  draws: (type: LotteryTypeId, limit = 5000) =>
+    request<DrawResult[]>(`/${type}/draws?limit=${limit}`),
 }

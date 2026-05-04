@@ -8,6 +8,7 @@ import {
   useDueNumbers, useWindowedFrequencies,
   useBalanceAnalysis, useSumDistribution,
   usePairAnalysis, useChiSquare, useBacktest, useBayesianAnalysis,
+  useDrawResults,
 } from '@/api/queries'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +17,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { cn, formatNumber } from '@/lib/utils'
 import type {
-  LotteryTypeId, DueNumber, WindowedFrequency, BalanceAnalysis, SumDistribution,
+  LotteryTypeId, DueNumber, DrawResult, WindowedFrequency, BalanceAnalysis, SumDistribution,
   NumberPair, ChiSquareResult, BacktestResult, BayesianNumber,
 } from '@/types/lottery'
 
@@ -2333,10 +2334,11 @@ interface GenWeights {
 }
 
 interface GeneratedCombo {
-  numbers: number[]
-  sum:     number
-  inRange: boolean
-  scores:  { due: number; bayes: number; arima: number; backtest: number; pairs: number; consensus: number }
+  numbers:      number[]
+  sum:          number
+  inRange:      boolean
+  wasDrawn:     boolean
+  scores:       { due: number; bayes: number; arima: number; backtest: number; pairs: number; consensus: number }
 }
 
 const WEIGHT_LABELS: Record<keyof GenWeights, string> = {
@@ -2349,7 +2351,7 @@ const WEIGHT_COLORS: Record<keyof GenWeights, string> = {
 }
 
 function CombinationGenerator({
-  rankedScores, bayesMap, dueMap, backtestMap, pairsMap, sumMap, arimaForecasts, arimaReady,
+  rankedScores, bayesMap, dueMap, backtestMap, pairsMap, sumMap, arimaForecasts, arimaReady, drawsMap,
 }: {
   rankedScores:   NumberScore[]
   bayesMap:       Record<string, BayesianNumber[] | undefined>
@@ -2359,16 +2361,30 @@ function CombinationGenerator({
   sumMap:         Record<string, SumDistribution | undefined>
   arimaForecasts: Record<string, Record<number, number>>
   arimaReady:     boolean
+  drawsMap:       Record<string, DrawResult[]>
 }) {
   const [weights, setWeights] = useState<GenWeights>({
     due: 70, bayes: 80, arima: 50, backtest: 65, pairs: 40, consensus: 75,
   })
-  const [numCombos,   setNumCombos]   = useState(5)
-  const [balance,     setBalance]     = useState<'3+3' | '4+2' | '2+4' | 'libre'>('3+3')
-  const [sigmaStrict, setSigmaStrict] = useState(true)
-  const [diversity,   setDiversity]   = useState(65)
-  const [results,     setResults]     = useState<GeneratedCombo[]>([])
-  const [generated,   setGenerated]   = useState(false)
+  const [numCombos,      setNumCombos]      = useState(5)
+  const [balance,        setBalance]        = useState<'3+3' | '4+2' | '2+4' | 'libre'>('3+3')
+  const [sigmaStrict,    setSigmaStrict]    = useState(true)
+  const [diversity,      setDiversity]      = useState(65)
+  const [excludeDrawn,   setExcludeDrawn]   = useState(false)
+  const [results,        setResults]        = useState<GeneratedCombo[]>([])
+  const [generated,      setGenerated]      = useState(false)
+
+  // Set of canonical drawn combo keys (sorted numbers joined with '-') across all games
+  const drawnSets = useMemo(() => {
+    const s = new Set<string>()
+    GAMES.forEach(g => {
+      drawsMap[g]?.forEach(d => {
+        const key = [...d.numbers].sort((a, b) => a - b).join('-')
+        s.add(key)
+      })
+    })
+    return s
+  }, [drawsMap])
 
   const opt = useMemo(() => {
     const arr = GAMES.map(g => sumMap[g]).filter(Boolean) as SumDistribution[]
@@ -2465,8 +2481,12 @@ function CombinationGenerator({
 
       const POOL = 12
 
+      const isDrawn = (combo: number[]) =>
+        excludeDrawn && drawnSets.has([...combo].sort((a, b) => a - b).join('-'))
+
       function search(pool: number[][]) {
         for (const combo of pool) {
+          if (isDrawn(combo)) continue
           const sum = combo.reduce((a, b) => a + b, 0)
           const sc  = combo.reduce((a, n) => a + (scoreMap[n] ?? 0), 0)
           if (sum >= sMin && sum <= sMax) {
@@ -2479,11 +2499,13 @@ function CombinationGenerator({
       }
 
       function bestOf(pool: number[][]): number[] {
-        return pool.reduce((best, c) => {
+        const filtered = excludeDrawn ? pool.filter(c => !isDrawn(c)) : pool
+        const src = filtered.length > 0 ? filtered : pool
+        return src.reduce((best, c) => {
           const sc = c.reduce((a, n) => a + (scoreMap[n] ?? 0), 0)
           const bsc = best.reduce((a, n) => a + (scoreMap[n] ?? 0), 0)
           return sc > bsc ? c : best
-        }, pool[0] ?? [])
+        }, src[0] ?? [])
       }
 
       if (balance === 'libre') {
@@ -2512,7 +2534,8 @@ function CombinationGenerator({
       combos.push({
         numbers: final,
         sum,
-        inRange: sum >= sMin && sum <= sMax,
+        inRange:  sum >= sMin && sum <= sMax,
+        wasDrawn: drawnSets.has(final.join('-')),
         scores: {
           due:       avgS('due'),
           bayes:     avgS('bayes'),
@@ -2661,6 +2684,41 @@ function CombinationGenerator({
 
             </div>
 
+            {/* Exclude drawn toggle */}
+            <Tip
+              content={`Omite combinaciones que ya aparecieron en el histórico de sorteos de Melate, Revancha o Revanchita. ${drawnSets.size > 0 ? `${drawnSets.size.toLocaleString()} combinaciones históricas cargadas.` : 'Cargando histórico…'}`}
+              side="top"
+            >
+              <button
+                type="button"
+                onClick={() => setExcludeDrawn(v => !v)}
+                className={cn(
+                  'w-full flex items-center gap-3 px-4 py-2.5 rounded-xl border text-sm font-medium transition-colors cursor-help',
+                  excludeDrawn
+                    ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-300'
+                    : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400',
+                )}
+              >
+                <span className={cn(
+                  'w-9 h-5 rounded-full transition-colors flex items-center shrink-0',
+                  excludeDrawn ? 'bg-violet-500' : 'bg-zinc-300 dark:bg-zinc-600',
+                )}>
+                  <span className={cn(
+                    'w-4 h-4 rounded-full bg-white shadow transition-transform mx-0.5',
+                    excludeDrawn ? 'translate-x-4' : 'translate-x-0',
+                  )} />
+                </span>
+                <span>
+                  Omitir combinaciones ya sorteadas
+                  {drawnSets.size > 0 && (
+                    <span className="ml-1 text-[10px] font-normal opacity-60">
+                      ({drawnSets.size.toLocaleString()} en histórico)
+                    </span>
+                  )}
+                </span>
+              </button>
+            </Tip>
+
             {/* Generate button */}
             <button
               onClick={generate}
@@ -2717,7 +2775,7 @@ function CombinationGenerator({
                           </span>
                         ))}
                       </div>
-                      <div className="flex flex-col items-end gap-0.5 shrink-0">
+                      <div className="flex flex-col items-end gap-1 shrink-0">
                         <Tip content={`Suma de los 6 números. Rango óptimo: ${sMin}–${sMax}. ${combo.inRange ? '✓ Dentro del rango' : '⚠ Fuera del rango'}`}>
                           <span className={cn(
                             'text-sm font-bold tabular-nums cursor-help',
@@ -2726,6 +2784,13 @@ function CombinationGenerator({
                             Σ {combo.sum} {combo.inRange ? '✓' : '~'}
                           </span>
                         </Tip>
+                        {combo.wasDrawn && (
+                          <Tip content="Esta combinación ya apareció en el histórico de sorteos." side="top">
+                            <span className="text-[9px] font-semibold px-1.5 py-0.5 rounded bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 cursor-help">
+                              ya sorteada
+                            </span>
+                          </Tip>
+                        )}
                         <button
                           onClick={() => navigator.clipboard?.writeText(combo.numbers.join(' - '))}
                           className="text-[10px] text-zinc-400 hover:text-violet-500 transition-colors"
@@ -2859,6 +2924,11 @@ export function ComparativePage() {
   const { data: sumMelate     } = useSumDistribution('MELATE')
   const { data: sumRevancha   } = useSumDistribution('REVANCHA')
   const { data: sumRevanchita } = useSumDistribution('REVANCHITA')
+
+  // Draw history (used by generator to filter already-drawn combinations)
+  const { data: drawsMelate     } = useDrawResults('MELATE')
+  const { data: drawsRevancha   } = useDrawResults('REVANCHA')
+  const { data: drawsRevanchita } = useDrawResults('REVANCHITA')
 
   // Pares tab
   const { data: pairsMelate     } = usePairAnalysis('MELATE',     15)
@@ -3203,6 +3273,11 @@ export function ComparativePage() {
             sumMap={sumMap}
             arimaForecasts={arimaForecasts}
             arimaReady={arimaReady}
+            drawsMap={{
+              MELATE:     drawsMelate     ?? [],
+              REVANCHA:   drawsRevancha   ?? [],
+              REVANCHITA: drawsRevanchita ?? [],
+            }}
           />
         </TabsContent>
 

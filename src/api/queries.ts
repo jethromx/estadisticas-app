@@ -4,6 +4,7 @@ import type { LotteryTypeId, SyncResult } from '@/types/lottery'
 
 
 export const keys = {
+  draws: (type: LotteryTypeId) => ['draws', type] as const,
   statistics:          (type: LotteryTypeId, from?: string, to?: string) => ['statistics', type, from, to] as const,
   frequencies:         (type: LotteryTypeId)                              => ['frequencies', type] as const,
   hotNumbers:          (type: LotteryTypeId, limit: number)               => ['hotNumbers', type, limit] as const,
@@ -129,6 +130,15 @@ export function useBayesianAnalysis(type: LotteryTypeId, recentWindow = 50) {
     queryKey: keys.bayesianAnalysis(type, recentWindow),
     queryFn:  () => api.bayesianAnalysis(type, recentWindow),
     enabled:  !!type,
+  })
+}
+
+export function useDrawResults(type: LotteryTypeId) {
+  return useQuery({
+    queryKey: keys.draws(type),
+    queryFn:  () => api.draws(type),
+    enabled:  !!type,
+    staleTime: 5 * 60 * 1000,
   })
 }
 
