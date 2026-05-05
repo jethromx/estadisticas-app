@@ -33,9 +33,12 @@ async function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
     if (res.status === 401) {
       throw new Error('Tu sesión ha expirado. Por favor inicia sesión de nuevo.')
     }
-    
+
     const err = await res.json().catch(() => ({ message: res.statusText }))
     throw new Error((err as { message?: string }).message ?? 'Error')
+  }
+  if (res.status === 204 || res.headers.get('content-length') === '0') {
+    return undefined as T
   }
   return res.json() as Promise<T>
 }
