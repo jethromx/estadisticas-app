@@ -26,14 +26,13 @@ async function authRequest<T>(path: string, options?: RequestInit): Promise<T> {
     },
   })
   if (!res.ok) {
-    // Handle specific HTTP status codes
-    if (res.status === 403) {
-      throw new Error('No tienes permisos para realizar esta acción. Solo admins pueden gestionar usuarios.')
-    }
     if (res.status === 401) {
+      window.dispatchEvent(new CustomEvent('auth:unauthorized'))
       throw new Error('Tu sesión ha expirado. Por favor inicia sesión de nuevo.')
     }
-
+    if (res.status === 403) {
+      throw new Error('No tienes permisos para realizar esta acción.')
+    }
     const err = await res.json().catch(() => ({ message: res.statusText }))
     throw new Error((err as { message?: string }).message ?? 'Error')
   }

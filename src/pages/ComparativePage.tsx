@@ -2366,6 +2366,7 @@ function CombinationGenerator({
   const deleteMutation             = useDeletePrediction()
   const analyzeMutation            = useAnalyzePrediction()
   const [analysisResults, setAnalysisResults] = useState<Record<string, PredictionAccuracyResult>>({})
+  const [analysisErrors,  setAnalysisErrors]  = useState<Record<string, string>>({})
   const [analyzingId, setAnalyzingId]         = useState<string | null>(null)
 
   function saveCurrentResults() {
@@ -2404,11 +2405,13 @@ function CombinationGenerator({
 
   function analyzeSet(id: string, syncFirst = false) {
     setAnalyzingId(id)
+    setAnalysisErrors(prev => { const n = { ...prev }; delete n[id]; return n })
     analyzeMutation.mutate(
       { id, syncFirst },
       {
         onSuccess: (result) => setAnalysisResults(prev => ({ ...prev, [id]: result })),
-        onSettled: () => setAnalyzingId(null),
+        onError:   (err)    => setAnalysisErrors(prev => ({ ...prev, [id]: err instanceof Error ? err.message : 'Error al analizar' })),
+        onSettled: ()       => setAnalyzingId(null),
       },
     )
   }
@@ -2907,6 +2910,13 @@ function CombinationGenerator({
                             </div>
                           )
                         })()}
+                      </div>
+                    )}
+
+                    {/* Analysis error */}
+                    {analysisErrors[set.id] && (
+                      <div className="border-t border-red-100 dark:border-red-900/40 bg-red-50/50 dark:bg-red-900/10 px-4 py-3">
+                        <p className="text-xs text-red-600 dark:text-red-400">⚠ {analysisErrors[set.id]}</p>
                       </div>
                     )}
 
