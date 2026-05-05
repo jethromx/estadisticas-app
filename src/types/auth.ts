@@ -49,10 +49,11 @@ export interface AdminPrediction {
   label: string
   savedAt: string
   latestDrawDate: string | null
-  combos: unknown
+  combos: Array<{ numbers: number[]; sum?: number }>
   lotteryType: string | null
   generationParams: Record<string, unknown> | null
-  userId: string
+  userId: string | null
+  username: string | null
 }
 
 export interface CreateUserRequest {

@@ -412,54 +412,77 @@ function PredictionsTab() {
   return (
     <div className="flex flex-col gap-4">
       <p className="text-sm text-zinc-500">{data.length} predicción{data.length !== 1 ? 'es' : ''}</p>
-      <Card>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-100 dark:border-zinc-800">
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Etiqueta</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Tipo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Usuario ID</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Guardado</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-zinc-500">Parámetros</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
-              {data.map(p => {
-                const paramsSummary = p.generationParams
-                  ? Object.entries(p.generationParams)
-                      .map(([k, v]) => `${k}: ${v}`)
-                      .join(', ')
-                      .slice(0, 80) || '—'
-                  : '—'
-                return (
-                  <tr key={p.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
-                    <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{p.label}</td>
-                    <td className="px-4 py-3">
-                      {p.lotteryType ? (
-                        <Badge variant="secondary">{p.lotteryType}</Badge>
-                      ) : (
-                        <span className="text-zinc-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-zinc-500">{p.userId}</td>
-                    <td className="px-4 py-3 text-zinc-500">
-                      {new Date(p.savedAt).toLocaleDateString('es-MX', {
-                        year: 'numeric',
-                        month: 'short',
-                        day: 'numeric',
-                      })}
-                    </td>
-                    <td className="px-4 py-3 max-w-xs truncate text-zinc-500" title={paramsSummary}>
-                      {paramsSummary}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </Card>
+      {data.map(p => {
+        const paramsSummary = p.generationParams
+          ? Object.entries(p.generationParams)
+              .map(([k, v]) => `${k}: ${v}`)
+              .join(' · ')
+          : null
+
+        return (
+          <Card key={p.id}>
+            <CardContent className="pt-4 pb-4">
+              <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-semibold text-zinc-900 dark:text-zinc-100">{p.label}</span>
+                  <span className="text-xs text-zinc-500">
+                    {new Date(p.savedAt).toLocaleDateString('es-MX', { year: 'numeric', month: 'short', day: 'numeric' })}
+                    {p.latestDrawDate && ` · sorteo ref: ${p.latestDrawDate}`}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {p.lotteryType ? (
+                    <Badge variant="secondary">{p.lotteryType}</Badge>
+                  ) : (
+                    <Badge variant="secondary" className="opacity-40">Sin tipo</Badge>
+                  )}
+                  <span className="text-xs text-zinc-500">
+                    Usuario: <span className="font-medium text-zinc-700 dark:text-zinc-300">{p.username ?? p.userId ?? '—'}</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Combos */}
+              {p.combos && p.combos.length > 0 ? (
+                <div className="flex flex-col gap-1.5">
+                  <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
+                    {p.combos.length} combinación{p.combos.length !== 1 ? 'es' : ''}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {p.combos.map((combo, i) => (
+                      <div
+                        key={i}
+                        className="flex items-center gap-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 px-2 py-1"
+                      >
+                        {combo.numbers.map((n, j) => (
+                          <span
+                            key={j}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-xs font-bold text-white"
+                          >
+                            {n}
+                          </span>
+                        ))}
+                        {combo.sum !== undefined && (
+                          <span className="ml-1 text-xs text-zinc-400">Σ{combo.sum}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-zinc-400">Sin combinaciones</p>
+              )}
+
+              {/* Params */}
+              {paramsSummary && (
+                <p className="mt-2 text-xs text-zinc-400 truncate" title={paramsSummary}>
+                  Params: {paramsSummary}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        )
+      })}
     </div>
   )
 }
