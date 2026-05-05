@@ -2361,7 +2361,7 @@ function CombinationGenerator({
   const [generated,      setGenerated]      = useState(false)
   const [expandedSetId,  setExpandedSetId]  = useState<string | null>(null)
 
-  const { data: savedSets = [] }   = useSavedPredictions()
+  const { data: savedSets = [], isLoading: savedSetsLoading } = useSavedPredictions()
   const saveMutation               = useSavePrediction()
   const deleteMutation             = useDeletePrediction()
   const analyzeMutation            = useAnalyzePrediction()
@@ -2774,7 +2774,7 @@ function CombinationGenerator({
       </Card>
 
       {/* ── Saved predictions ── */}
-      {savedSets.length > 0 && (
+      {(savedSetsLoading || savedSets.length > 0) && (
         <Card>
           <CardHeader>
             <CardTitle className="text-zinc-800 dark:text-zinc-200">📌 Predicciones Guardadas</CardTitle>
@@ -2784,6 +2784,13 @@ function CombinationGenerator({
             </p>
           </CardHeader>
           <CardContent>
+            {savedSetsLoading ? (
+              <div className="flex flex-col gap-3">
+                {[1, 2, 3].map(i => (
+                  <div key={i} className="h-14 rounded-xl bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                ))}
+              </div>
+            ) : (
             <div className="flex flex-col gap-5">
               {savedSets.map(set => {
                 const allNewDraws = GAMES.flatMap(g =>
@@ -3013,6 +3020,7 @@ function CombinationGenerator({
                 )
               })}
             </div>
+            )}
           </CardContent>
         </Card>
       )}
