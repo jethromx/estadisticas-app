@@ -413,15 +413,13 @@ function PredictionsTab() {
     <div className="flex flex-col gap-4">
       <p className="text-sm text-zinc-500">{data.length} predicción{data.length !== 1 ? 'es' : ''}</p>
       {data.map(p => {
-        const paramsSummary = p.generationParams
-          ? Object.entries(p.generationParams)
-              .map(([k, v]) => `${k}: ${v}`)
-              .join(' · ')
-          : null
+        const gp = p.generationParams
+        const weights = gp?.weights as Record<string, number> | undefined
 
         return (
           <Card key={p.id}>
             <CardContent className="pt-4 pb-4">
+              {/* Header */}
               <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
                 <div className="flex flex-col gap-0.5">
                   <span className="font-semibold text-zinc-900 dark:text-zinc-100">{p.label}</span>
@@ -431,11 +429,7 @@ function PredictionsTab() {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  {p.lotteryType ? (
-                    <Badge variant="secondary">{p.lotteryType}</Badge>
-                  ) : (
-                    <Badge variant="secondary" className="opacity-40">Sin tipo</Badge>
-                  )}
+                  {p.lotteryType && <Badge variant="secondary">{p.lotteryType}</Badge>}
                   <span className="text-xs text-zinc-500">
                     Usuario: <span className="font-medium text-zinc-700 dark:text-zinc-300">{p.username ?? p.userId ?? '—'}</span>
                   </span>
@@ -444,7 +438,7 @@ function PredictionsTab() {
 
               {/* Combos */}
               {p.combos && p.combos.length > 0 ? (
-                <div className="flex flex-col gap-1.5">
+                <div className="flex flex-col gap-1.5 mb-3">
                   <p className="text-xs font-medium uppercase tracking-wider text-zinc-400">
                     {p.combos.length} combinación{p.combos.length !== 1 ? 'es' : ''}
                   </p>
@@ -470,14 +464,36 @@ function PredictionsTab() {
                   </div>
                 </div>
               ) : (
-                <p className="text-xs text-zinc-400">Sin combinaciones</p>
+                <p className="text-xs text-zinc-400 mb-3">Sin combinaciones</p>
               )}
 
-              {/* Params */}
-              {paramsSummary && (
-                <p className="mt-2 text-xs text-zinc-400 truncate" title={paramsSummary}>
-                  Params: {paramsSummary}
-                </p>
+              {/* Generation params */}
+              {gp && (
+                <div className="rounded-lg bg-zinc-50 dark:bg-zinc-800/50 px-3 py-2 flex flex-wrap gap-x-4 gap-y-1">
+                  {gp.numCombos !== undefined && (
+                    <span className="text-xs text-zinc-500">Combos: <b className="text-zinc-700 dark:text-zinc-300">{String(gp.numCombos)}</b></span>
+                  )}
+                  {gp.balance !== undefined && (
+                    <span className="text-xs text-zinc-500">Balance: <b className="text-zinc-700 dark:text-zinc-300">{String(gp.balance)}</b></span>
+                  )}
+                  {gp.diversity !== undefined && (
+                    <span className="text-xs text-zinc-500">Diversidad: <b className="text-zinc-700 dark:text-zinc-300">{String(gp.diversity)}%</b></span>
+                  )}
+                  {gp.sumMin !== undefined && gp.sumMax !== undefined && (
+                    <span className="text-xs text-zinc-500">Suma: <b className="text-zinc-700 dark:text-zinc-300">{String(gp.sumMin)}–{String(gp.sumMax)}</b></span>
+                  )}
+                  {gp.sigmaStrict !== undefined && (
+                    <span className="text-xs text-zinc-500">Rango estricto: <b className="text-zinc-700 dark:text-zinc-300">{gp.sigmaStrict ? 'sí' : 'no'}</b></span>
+                  )}
+                  {gp.excludeDrawn !== undefined && (
+                    <span className="text-xs text-zinc-500">Excluir sorteos: <b className="text-zinc-700 dark:text-zinc-300">{gp.excludeDrawn ? 'sí' : 'no'}</b></span>
+                  )}
+                  {weights && (
+                    <span className="text-xs text-zinc-500 w-full">
+                      Pesos: {Object.entries(weights).map(([k, v]) => `${k} ${v}`).join(' · ')}
+                    </span>
+                  )}
+                </div>
               )}
             </CardContent>
           </Card>

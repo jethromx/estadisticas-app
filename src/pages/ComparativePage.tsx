@@ -2376,6 +2376,18 @@ function CombinationGenerator({
         label: `Predicción ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}`,
         latestDrawDate,
         combos: results,
+        lotteryType: null,
+        generationParams: {
+          weights,
+          numCombos,
+          balance,
+          sigmaStrict,
+          diversity,
+          excludeDrawn,
+          sumMin: opt.sMin,
+          sumMax: opt.sMax,
+          games: GAMES,
+        },
       },
       { onSuccess: (saved: SavedPredictionSet) => setExpandedSetId(saved.id) },
     )

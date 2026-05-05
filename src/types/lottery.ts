@@ -172,7 +172,9 @@ export interface SavedPredictionSet {
 }
 
 export interface SavePredictionRequest {
-  label:          string
-  latestDrawDate: string | null
-  combos:         GeneratedCombo[]
+  label:            string
+  latestDrawDate:   string | null
+  combos:           GeneratedCombo[]
+  lotteryType?:     string | null
+  generationParams?: Record<string, unknown> | null
 }
