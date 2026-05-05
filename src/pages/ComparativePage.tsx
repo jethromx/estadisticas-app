@@ -9,6 +9,7 @@ import {
   useBalanceAnalysis, useSumDistribution,
   usePairAnalysis, useChiSquare, useBacktest, useBayesianAnalysis,
   useDrawResults, useSavedPredictions, useSavePrediction, useDeletePrediction,
+  useAnalyzePrediction,
 } from '@/api/queries'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -19,7 +20,7 @@ import { cn, formatNumber } from '@/lib/utils'
 import type {
   LotteryTypeId, DueNumber, DrawResult, WindowedFrequency, BalanceAnalysis, SumDistribution,
   NumberPair, ChiSquareResult, BacktestResult, BayesianNumber,
-  GenWeights, GeneratedCombo, SavedPredictionSet,
+  GenWeights, GeneratedCombo, SavedPredictionSet, PredictionAccuracyResult,
 } from '@/types/lottery'
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -2363,6 +2364,9 @@ function CombinationGenerator({
   const { data: savedSets = [] }   = useSavedPredictions()
   const saveMutation               = useSavePrediction()
   const deleteMutation             = useDeletePrediction()
+  const analyzeMutation            = useAnalyzePrediction()
+  const [analysisResults, setAnalysisResults] = useState<Record<string, PredictionAccuracyResult>>({})
+  const [analyzingId, setAnalyzingId]         = useState<string | null>(null)
 
   function saveCurrentResults() {
     if (!results.length) return
@@ -2396,6 +2400,17 @@ function CombinationGenerator({
   function deleteSet(id: string) {
     deleteMutation.mutate(id)
     if (expandedSetId === id) setExpandedSetId(null)
+  }
+
+  function analyzeSet(id: string, syncFirst = false) {
+    setAnalyzingId(id)
+    analyzeMutation.mutate(
+      { id, syncFirst },
+      {
+        onSuccess: (result) => setAnalysisResults(prev => ({ ...prev, [id]: result })),
+        onSettled: () => setAnalyzingId(null),
+      },
+    )
   }
 
   // Set of canonical drawn combo keys (sorted numbers joined with '-') across all games
@@ -2795,8 +2810,16 @@ function CombinationGenerator({
                         <span className="ml-auto text-zinc-400 text-xs">{isExpanded ? '▲' : '▼'}</span>
                       </button>
                       <button
+                        onClick={() => analyzeSet(set.id)}
+                        disabled={analyzingId === set.id}
+                        className="ml-3 rounded-lg border border-violet-200 dark:border-violet-800 px-2.5 py-1 text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/30 disabled:opacity-50 transition-colors"
+                        title="Analizar precisión vs sorteos posteriores"
+                      >
+                        {analyzingId === set.id ? '…' : '⚡ Analizar'}
+                      </button>
+                      <button
                         onClick={() => deleteSet(set.id)}
-                        className="ml-3 text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 transition-colors text-base"
+                        className="ml-1 text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 transition-colors text-base"
                         title="Eliminar predicción"
                       >
                         🗑
@@ -2886,6 +2909,96 @@ function CombinationGenerator({
                         })()}
                       </div>
                     )}
+
+                    {/* Analysis panel */}
+                    {analysisResults[set.id] && (() => {
+                      const r = analysisResults[set.id]
+                      return (
+                        <div className="border-t border-violet-100 dark:border-violet-900/40 bg-violet-50/50 dark:bg-violet-900/10 px-4 py-4 flex flex-col gap-4">
+                          {/* Summary row */}
+                          <div className="flex flex-wrap gap-4">
+                            <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-violet-100 dark:border-violet-900/40 px-4 py-2 min-w-[80px]">
+                              <span className="text-xl font-bold text-violet-600 dark:text-violet-400">{r.drawsAnalyzed}</span>
+                              <span className="text-[10px] text-zinc-400 text-center">sorteos<br/>analizados</span>
+                            </div>
+                            <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-emerald-100 dark:border-emerald-900/40 px-4 py-2 min-w-[80px]">
+                              <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{r.bestMatchCount}/6</span>
+                              <span className="text-[10px] text-zinc-400 text-center">mejor<br/>acierto</span>
+                            </div>
+                            <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-sky-100 dark:border-sky-900/40 px-4 py-2 min-w-[80px]">
+                              <span className="text-xl font-bold text-sky-600 dark:text-sky-400">{r.averageMatchCount.toFixed(1)}</span>
+                              <span className="text-[10px] text-zinc-400 text-center">promedio<br/>por combo</span>
+                            </div>
+                            <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 px-4 py-2 min-w-[80px]">
+                              <span className="text-xl font-bold text-zinc-500">{r.worstMatchCount}/6</span>
+                              <span className="text-[10px] text-zinc-400 text-center">peor<br/>acierto</span>
+                            </div>
+                          </div>
+
+                          {/* Per-combo breakdown */}
+                          {r.drawsAnalyzed > 0 && r.comboDetails.length > 0 && (
+                            <div className="flex flex-col gap-2">
+                              <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500 dark:text-violet-400">Detalle por combinación</p>
+                              {r.comboDetails.map((detail, ci) => {
+                                const pct = r.bestMatchCount > 0 ? detail.bestMatchCount / 6 : 0
+                                return (
+                                  <div key={ci} className="flex items-center gap-3 flex-wrap">
+                                    <div className="flex gap-1">
+                                      {detail.comboNumbers.map(n => (
+                                        <span
+                                          key={n}
+                                          className={cn(
+                                            'inline-flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold',
+                                            detail.bestMatchCount >= 4 ? 'bg-emerald-500 text-white' :
+                                            detail.bestMatchCount >= 3 ? 'bg-amber-400 text-white' :
+                                            detail.bestMatchCount >= 2 ? 'bg-sky-400 text-white' :
+                                            'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400',
+                                          )}
+                                        >{n}</span>
+                                      ))}
+                                    </div>
+                                    <div className="flex-1 min-w-[100px]">
+                                      <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                                        <div
+                                          className={cn('h-full rounded-full transition-all',
+                                            pct >= 0.67 ? 'bg-emerald-500' : pct >= 0.5 ? 'bg-amber-400' : pct >= 0.33 ? 'bg-sky-400' : 'bg-zinc-300 dark:bg-zinc-600'
+                                          )}
+                                          style={{ width: `${Math.round(pct * 100)}%` }}
+                                        />
+                                      </div>
+                                    </div>
+                                    <span className="text-xs font-mono text-zinc-500 w-10 text-right">
+                                      {detail.bestMatchCount}/6 · ø{detail.averageMatchCount.toFixed(1)}
+                                    </span>
+                                  </div>
+                                )
+                              })}
+                            </div>
+                          )}
+
+                          {/* Suggestions */}
+                          {r.improvementSuggestions.length > 0 && (
+                            <div className="flex flex-col gap-1.5">
+                              <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500 dark:text-violet-400">Sugerencias</p>
+                              {r.improvementSuggestions.map((s, i) => (
+                                <p key={i} className="text-xs text-zinc-600 dark:text-zinc-300 flex gap-2">
+                                  <span className="text-violet-400 shrink-0">›</span>{s}
+                                </p>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Sync & re-analyze */}
+                          <button
+                            onClick={() => analyzeSet(set.id, true)}
+                            disabled={analyzingId === set.id}
+                            className="self-start text-[11px] text-violet-500 hover:text-violet-700 dark:hover:text-violet-300 disabled:opacity-50 underline underline-offset-2"
+                          >
+                            {analyzingId === set.id ? 'Analizando…' : '↺ Sincronizar sorteos y re-analizar'}
+                          </button>
+                        </div>
+                      )
+                    })()}
                   </div>
                 )
               })}

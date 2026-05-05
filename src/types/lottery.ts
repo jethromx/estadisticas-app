@@ -178,3 +178,22 @@ export interface SavePredictionRequest {
   lotteryType?:     string | null
   generationParams?: Record<string, unknown> | null
 }
+
+export interface ComboMatchDetail {
+  comboNumbers:     number[]
+  bestMatchCount:   number
+  averageMatchCount: number
+  matchesPerDraw:   Record<string, number>   // date -> matches
+}
+
+export interface PredictionAccuracyResult {
+  predictionId:          string
+  predictionLabel:       string
+  lotteryType:           string | null
+  drawsAnalyzed:         number
+  bestMatchCount:        number
+  worstMatchCount:       number
+  averageMatchCount:     number
+  comboDetails:          ComboMatchDetail[]
+  improvementSuggestions: string[]
+}

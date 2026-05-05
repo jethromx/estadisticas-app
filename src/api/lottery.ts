@@ -16,6 +16,7 @@ import type {
   BayesianNumber,
   SavedPredictionSet,
   SavePredictionRequest,
+  PredictionAccuracyResult,
 } from '@/types/lottery'
 
 const BASE        = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/lottery`
@@ -127,4 +128,9 @@ export const predictionsApi = {
 
   delete: (id: string) =>
     predRequest<void>(`/${id}`, { method: 'DELETE' }),
+
+  analyze: (id: string, syncFirst = false) =>
+    predRequest<PredictionAccuracyResult>(`/${id}/analyze?syncFirst=${syncFirst}`, {
+      method: 'POST',
+    }),
 }

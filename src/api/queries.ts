@@ -172,3 +172,10 @@ export function useDeletePrediction() {
     onSuccess:  () => qc.invalidateQueries({ queryKey: ['savedPredictions'] }),
   })
 }
+
+export function useAnalyzePrediction() {
+  return useMutation({
+    mutationFn: ({ id, syncFirst = false }: { id: string; syncFirst?: boolean }) =>
+      predictionsApi.analyze(id, syncFirst),
+  })
+}
