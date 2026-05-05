@@ -96,6 +96,7 @@ function UsersTab() {
     email: '',
     role: 'USER',
     active: true,
+    password: '',
   })
 
   async function handleCreate(e: React.FormEvent) {
@@ -121,6 +122,7 @@ function UsersTab() {
       email: user.email,
       role: user.role,
       active: user.active,
+      password: '',
     })
   }
 
@@ -303,6 +305,18 @@ function UsersTab() {
                     <option value="false">Inactivo</option>
                   </select>
                 </div>
+                <div className="flex flex-col gap-1 sm:col-span-2">
+                  <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">
+                    Nueva contraseña <span className="font-normal text-zinc-400">(dejar vacío para no cambiar)</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={editForm.password ?? ''}
+                    onChange={e => setEditForm(f => ({ ...f, password: e.target.value }))}
+                    placeholder="••••••••"
+                    className="rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-100"
+                  />
+                </div>
               </div>
               <div className="flex justify-end gap-2">
                 <button
@@ -412,18 +426,12 @@ function PredictionsTab() {
             </thead>
             <tbody className="divide-y divide-zinc-100 dark:divide-zinc-800">
               {data.map(p => {
-                let paramsSummary = '—'
-                if (p.generationParamsJson) {
-                  try {
-                    const params = JSON.parse(p.generationParamsJson) as Record<string, unknown>
-                    paramsSummary = Object.entries(params)
+                const paramsSummary = p.generationParams
+                  ? Object.entries(p.generationParams)
                       .map(([k, v]) => `${k}: ${v}`)
                       .join(', ')
-                      .slice(0, 60)
-                  } catch {
-                    paramsSummary = p.generationParamsJson.slice(0, 60)
-                  }
-                }
+                      .slice(0, 80) || '—'
+                  : '—'
                 return (
                   <tr key={p.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/50">
                     <td className="px-4 py-3 font-medium text-zinc-900 dark:text-zinc-100">{p.label}</td>

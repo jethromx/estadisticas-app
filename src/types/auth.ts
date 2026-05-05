@@ -49,9 +49,9 @@ export interface AdminPrediction {
   label: string
   savedAt: string
   latestDrawDate: string | null
-  combosJson: string
+  combos: unknown
   lotteryType: string | null
-  generationParamsJson: string | null
+  generationParams: Record<string, unknown> | null
   userId: string
 }
 
@@ -67,4 +67,5 @@ export interface UpdateUserRequest {
   email: string
   role: string
   active: boolean
+  password?: string
 }
