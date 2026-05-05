@@ -3174,12 +3174,12 @@ export function ComparativePage() {
   const { data: wfRevanchita,  isLoading: l6 } = useWindowedFrequencies('REVANCHITA', 100)
 
   // Trend windows — w=100 already loaded above; only w=50 and w=300 are new (6 extra calls).
-  const { data: wf50Melate      } = useWindowedFrequencies('MELATE',       50)
-  const { data: wf300Melate     } = useWindowedFrequencies('MELATE',      300)
-  const { data: wf50Revancha    } = useWindowedFrequencies('REVANCHA',     50)
-  const { data: wf300Revancha   } = useWindowedFrequencies('REVANCHA',    300)
-  const { data: wf50Revanchita  } = useWindowedFrequencies('REVANCHITA',   50)
-  const { data: wf300Revanchita } = useWindowedFrequencies('REVANCHITA',  300)
+  const { data: wf50Melate,      isLoading: la1 } = useWindowedFrequencies('MELATE',       50)
+  const { data: wf300Melate,     isLoading: la2 } = useWindowedFrequencies('MELATE',      300)
+  const { data: wf50Revancha,    isLoading: la3 } = useWindowedFrequencies('REVANCHA',     50)
+  const { data: wf300Revancha,   isLoading: la4 } = useWindowedFrequencies('REVANCHA',    300)
+  const { data: wf50Revanchita,  isLoading: la5 } = useWindowedFrequencies('REVANCHITA',   50)
+  const { data: wf300Revanchita, isLoading: la6 } = useWindowedFrequencies('REVANCHITA',  300)
 
   // Linear trend forecast — synchronous, no external library.
   // For 3 evenly-spaced points [oldest, middle, recent], least-squares slope = (recent − oldest)/2,
@@ -3219,13 +3219,13 @@ export function ComparativePage() {
   const arimaReady = Object.keys(arimaForecasts).length > 0
 
   // Distribucion tab data (loads independently)
-  const { data: balMelate     } = useBalanceAnalysis('MELATE')
-  const { data: balRevancha   } = useBalanceAnalysis('REVANCHA')
-  const { data: balRevanchita } = useBalanceAnalysis('REVANCHITA')
+  const { data: balMelate,     isLoading: lb1 } = useBalanceAnalysis('MELATE')
+  const { data: balRevancha,   isLoading: lb2 } = useBalanceAnalysis('REVANCHA')
+  const { data: balRevanchita, isLoading: lb3 } = useBalanceAnalysis('REVANCHITA')
 
-  const { data: sumMelate     } = useSumDistribution('MELATE')
-  const { data: sumRevancha   } = useSumDistribution('REVANCHA')
-  const { data: sumRevanchita } = useSumDistribution('REVANCHITA')
+  const { data: sumMelate,     isLoading: ls1 } = useSumDistribution('MELATE')
+  const { data: sumRevancha,   isLoading: ls2 } = useSumDistribution('REVANCHA')
+  const { data: sumRevanchita, isLoading: ls3 } = useSumDistribution('REVANCHITA')
 
   // Draw history (used by generator to filter already-drawn combinations)
   const { data: drawsMelate     } = useDrawResults('MELATE')
@@ -3233,27 +3233,33 @@ export function ComparativePage() {
   const { data: drawsRevanchita } = useDrawResults('REVANCHITA')
 
   // Pares tab
-  const { data: pairsMelate     } = usePairAnalysis('MELATE',     15)
-  const { data: pairsRevancha   } = usePairAnalysis('REVANCHA',   15)
-  const { data: pairsRevanchita } = usePairAnalysis('REVANCHITA', 15)
+  const { data: pairsMelate,     isLoading: lp1 } = usePairAnalysis('MELATE',     15)
+  const { data: pairsRevancha,   isLoading: lp2 } = usePairAnalysis('REVANCHA',   15)
+  const { data: pairsRevanchita, isLoading: lp3 } = usePairAnalysis('REVANCHITA', 15)
 
   // Chi-square tab
-  const { data: chiMelate     } = useChiSquare('MELATE')
-  const { data: chiRevancha   } = useChiSquare('REVANCHA')
-  const { data: chiRevanchita } = useChiSquare('REVANCHITA')
+  const { data: chiMelate,     isLoading: lc1 } = useChiSquare('MELATE')
+  const { data: chiRevancha,   isLoading: lc2 } = useChiSquare('REVANCHA')
+  const { data: chiRevanchita, isLoading: lc3 } = useChiSquare('REVANCHITA')
 
   // Backtest tab
-  const { data: btMelate     } = useBacktest('MELATE',     6, 100)
-  const { data: btRevancha   } = useBacktest('REVANCHA',   6, 100)
-  const { data: btRevanchita } = useBacktest('REVANCHITA', 6, 100)
+  const { data: btMelate,     isLoading: lbt1 } = useBacktest('MELATE',     6, 100)
+  const { data: btRevancha,   isLoading: lbt2 } = useBacktest('REVANCHA',   6, 100)
+  const { data: btRevanchita, isLoading: lbt3 } = useBacktest('REVANCHITA', 6, 100)
 
   // Bayesian tab
-  const { data: bayMelate     } = useBayesianAnalysis('MELATE',     50)
-  const { data: bayRevancha   } = useBayesianAnalysis('REVANCHA',   50)
-  const { data: bayRevanchita } = useBayesianAnalysis('REVANCHITA', 50)
+  const { data: bayMelate,     isLoading: lby1 } = useBayesianAnalysis('MELATE',     50)
+  const { data: bayRevancha,   isLoading: lby2 } = useBayesianAnalysis('REVANCHA',   50)
+  const { data: bayRevanchita, isLoading: lby3 } = useBayesianAnalysis('REVANCHITA', 50)
 
   // Only core data blocks the spinner
-  const loading = l1 || l2 || l3 || l4 || l5 || l6
+  const loading        = l1  || l2  || l3  || l4  || l5  || l6
+  const arimaLoading   = la1 || la2 || la3 || la4 || la5 || la6
+  const distribLoading = lb1 || lb2 || lb3 || ls1 || ls2 || ls3
+  const pairsLoading   = lp1 || lp2 || lp3
+  const chiLoading     = lc1 || lc2 || lc3
+  const backtestLoading = lbt1 || lbt2 || lbt3
+  const bayesLoading   = lby1 || lby2 || lby3
 
   const dueMap: Record<string, DueNumber[]> = {
     MELATE:     dueMelate     ?? [],
@@ -3447,7 +3453,9 @@ export function ComparativePage() {
                 </p>
               </CardHeader>
               <CardContent>
-                <SumOverlayChart sumDists={sumMap} />
+                {distribLoading
+                  ? <div className="h-40 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                  : <SumOverlayChart sumDists={sumMap} />}
               </CardContent>
             </Card>
 
@@ -3459,7 +3467,9 @@ export function ComparativePage() {
                 </p>
               </CardHeader>
               <CardContent>
-                <BalanceComparison balances={balMap} />
+                {distribLoading
+                  ? <div className="h-24 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                  : <BalanceComparison balances={balMap} />}
               </CardContent>
             </Card>
 
@@ -3478,7 +3488,9 @@ export function ComparativePage() {
               </p>
             </CardHeader>
             <CardContent>
-              <PairsComparison pairsMap={pairsMap} top15Numbers={top15Set} />
+              {pairsLoading
+                ? <div className="h-48 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                : <PairsComparison pairsMap={pairsMap} top15Numbers={top15Set} />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -3496,7 +3508,9 @@ export function ComparativePage() {
               </p>
             </CardHeader>
             <CardContent>
-              <BayesianComparison bayesMap={bayesMap} />
+              {bayesLoading
+                ? <div className="h-48 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                : <BayesianComparison bayesMap={bayesMap} />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -3513,7 +3527,9 @@ export function ComparativePage() {
               </p>
             </CardHeader>
             <CardContent>
-              <BacktestComparison backtestMap={backtestMap} />
+              {backtestLoading
+                ? <div className="h-32 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                : <BacktestComparison backtestMap={backtestMap} />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -3529,7 +3545,9 @@ export function ComparativePage() {
               </p>
             </CardHeader>
             <CardContent>
-              <ChiSquareComparison chiMap={chiMap} />
+              {chiLoading
+                ? <div className="h-32 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                : <ChiSquareComparison chiMap={chiMap} />}
             </CardContent>
           </Card>
         </TabsContent>
@@ -3545,7 +3563,9 @@ export function ComparativePage() {
               </p>
             </CardHeader>
             <CardContent>
-              <ArimaComparison arimaForecasts={arimaForecasts} arimaReady={arimaReady} />
+              {arimaLoading
+                ? <div className="h-48 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                : <ArimaComparison arimaForecasts={arimaForecasts} arimaReady={arimaReady} />}
             </CardContent>
           </Card>
         </TabsContent>

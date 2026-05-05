@@ -940,8 +940,8 @@ export function GamePage() {
 
   const { data: stats,      isLoading: loadingStats } = useStatistics(typeId)
   const { data: freqs,      isLoading: loadingFreqs } = useFrequencies(typeId)
-  const { data: hot }                                 = useHotNumbers(typeId, 15)
-  const { data: cold }                                = useColdNumbers(typeId, 15)
+  const { data: hot,  isLoading: loadingHot  }        = useHotNumbers(typeId, 15)
+  const { data: cold, isLoading: loadingCold }        = useColdNumbers(typeId, 15)
   const { data: dueNums,     isLoading: loadingDue }  = useDueNumbers(typeId, 10)
   const { data: balance,     isLoading: loadingBal }  = useBalanceAnalysis(typeId)
   const { data: sumDist,     isLoading: loadingSum }  = useSumDistribution(typeId)
@@ -1123,7 +1123,9 @@ export function GamePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {hot?.length ? hot.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} />) : <p className="text-sm text-zinc-500">Sin datos.</p>}
+                {loadingHot
+                  ? <div className="flex flex-col gap-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-8 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />)}</div>
+                  : hot?.length ? hot.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} />) : <p className="text-sm text-zinc-500">Sin datos.</p>}
               </CardContent>
             </Card>
             <Card>
@@ -1133,7 +1135,9 @@ export function GamePage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {cold?.length ? cold.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} />) : <p className="text-sm text-zinc-500">Sin datos.</p>}
+                {loadingCold
+                  ? <div className="flex flex-col gap-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-8 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />)}</div>
+                  : cold?.length ? cold.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} />) : <p className="text-sm text-zinc-500">Sin datos.</p>}
               </CardContent>
             </Card>
           </div>
