@@ -5,6 +5,7 @@ import {
 } from '@/api/queries'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Tooltip as Tip } from '@/components/ui/tooltip'
+import { CombinationGenerator } from '@/components/CombinationGenerator'
 import { cn } from '@/lib/utils'
 import type {
   LotteryTypeId, DrawResult, SavedPredictionSet, PredictionAccuracyResult,
@@ -56,25 +57,30 @@ export function PredictionsPage() {
 
       {/* Page header */}
       <div>
-        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Mis Predicciones</h1>
+        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Predicciones</h1>
         <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Predicciones guardadas desde el generador. Compara tus combinaciones con los sorteos posteriores
-          a su generación — los números en verde aparecieron en algún sorteo real.
+          Genera combinaciones con el análisis estadístico cruzado de Melate, Revancha y Revanchita,
+          guárdalas y compáralas con los sorteos posteriores.
         </p>
+      </div>
+
+      {/* Generator */}
+      <CombinationGenerator />
+
+      {/* Saved predictions header */}
+      <div className="flex items-center gap-3 pt-2">
+        <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-700" />
+        <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+          Predicciones guardadas
+        </span>
+        <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-700" />
       </div>
 
       {/* Empty state */}
       {!savedSetsLoading && savedSets.length === 0 && (
-        <Card>
-          <CardContent className="py-16 flex flex-col items-center gap-3 text-center">
-            <span className="text-4xl">🔮</span>
-            <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Sin predicciones guardadas</p>
-            <p className="text-xs text-zinc-400 dark:text-zinc-500 max-w-xs">
-              Genera combinaciones en la sección <b>Análisis → Comparativo → Generador</b> y guárdalas aquí
-              para hacer seguimiento con los sorteos futuros.
-            </p>
-          </CardContent>
-        </Card>
+        <p className="text-center text-sm text-zinc-400 dark:text-zinc-500 py-4">
+          Aún no hay predicciones guardadas. Genera una arriba y pulsa "Guardar predicción".
+        </p>
       )}
 
       {/* Skeleton while loading */}

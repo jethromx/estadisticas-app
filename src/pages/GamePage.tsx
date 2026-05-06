@@ -186,7 +186,7 @@ function WindowedFrequenciesTab({ typeId }: { typeId: LotteryTypeId }) {
           {/* Bar chart colored by trend */}
           <Card>
             <CardHeader>
-              <CardTitle>Frecuencia en últimos {data[0]?.windowDrawCount ?? window} sorteos</CardTitle>
+              <CardTitle>Frecuencia en últimos {data[0]?.windowDrawCount ?? winSize} sorteos</CardTitle>
               <p className="text-xs text-zinc-500 dark:text-zinc-400">
                 Barras <span className="text-emerald-600 font-medium">verdes</span> = aparece más que su promedio histórico ·
                 <span className="text-red-500 font-medium"> rojas</span> = por debajo del promedio
@@ -968,18 +968,22 @@ export function GamePage() {
       </div>
 
       <Tabs defaultValue="due">
-        <TabsList>
+        <TabsList className="flex-wrap h-auto gap-y-1">
+          {/* Vista general */}
           <TabsTrigger value="due">Por salir</TabsTrigger>
           <TabsTrigger value="trend">Tendencia</TabsTrigger>
           <TabsTrigger value="balance">Balance</TabsTrigger>
           <TabsTrigger value="sum">Suma</TabsTrigger>
+          <TabsTrigger value="stats">Histórico</TabsTrigger>
+          <TabsTrigger value="freqs">Frecuencias</TabsTrigger>
+          <TabsTrigger value="hotcold">Cal / Fríos</TabsTrigger>
+          {/* Separador visual */}
+          <span className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 self-center" />
+          {/* Análisis avanzado */}
           <TabsTrigger value="pairs">Pares</TabsTrigger>
           <TabsTrigger value="bayesian">Bayesiano</TabsTrigger>
           <TabsTrigger value="backtest">Backtest</TabsTrigger>
           <TabsTrigger value="chisq">Chi²</TabsTrigger>
-          <TabsTrigger value="stats">Histórico</TabsTrigger>
-          <TabsTrigger value="freqs">Frecuencias</TabsTrigger>
-          <TabsTrigger value="hotcold">Cal / Fríos</TabsTrigger>
           <TabsTrigger value="suggestions">Sugerencias</TabsTrigger>
         </TabsList>
 
