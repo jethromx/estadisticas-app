@@ -7,6 +7,7 @@ import { Layout } from '@/components/Layout'
 import { Dashboard } from '@/pages/Dashboard'
 import { GamePage } from '@/pages/GamePage'
 import { ComparativePage } from '@/pages/ComparativePage'
+import { PredictionsPage } from '@/pages/PredictionsPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { RegisterPage } from '@/pages/RegisterPage'
 import { AdminDashboard } from '@/pages/admin/AdminDashboard'
@@ -26,6 +27,7 @@ export default function App() {
                 <Route index element={<Dashboard />} />
                 <Route path="game/:id" element={<GamePage />} />
                 <Route path="comparative" element={<ComparativePage />} />
+                <Route path="predicciones" element={<PredictionsPage />} />
                 <Route element={<AdminRoute />}>
                   <Route path="admin" element={<AdminDashboard />} />
                 </Route>
