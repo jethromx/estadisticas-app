@@ -66,15 +66,6 @@ function computeScores(
   })
 }
 
-function pickBalanced(ranked: NumberScore[]): number[] {
-  const odd  = ranked.filter(s => s.number % 2 !== 0)
-  const even = ranked.filter(s => s.number % 2 === 0)
-  return [
-    ...odd.slice(0, 3).map(s => s.number),
-    ...even.slice(0, 3).map(s => s.number),
-  ].sort((a, b) => a - b)
-}
-
 // ── Component ──────────────────────────────────────────────────────────────────
 
 export function CombinationGenerator() {

@@ -9,7 +9,7 @@ import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { CombinationGenerator } from '@/components/CombinationGenerator'
 import { cn } from '@/lib/utils'
 import type {
-  LotteryTypeId, DrawResult, SavedPredictionSet, PredictionAccuracyResult,
+  LotteryTypeId, DrawResult, PredictionAccuracyResult,
 } from '@/types/lottery'
 
 const GAMES: LotteryTypeId[] = ['MELATE', 'REVANCHA', 'REVANCHITA']
@@ -32,11 +32,11 @@ function ComboLookup({ drawsMap }: { drawsMap: Record<string, DrawResult[]> }) {
   const inputRefs = useRef<(HTMLInputElement | null)[]>([])
 
   // Per-cell error flags derived from current state
-  const filledNums = cells.map(Number).filter((n, i) => cells[i] !== '')
+  const filledNums = cells.map(Number).filter((_, i) => cells[i] !== '')
   const duplicates = new Set(
     filledNums.filter((n, i) => filledNums.indexOf(n) !== i)
   )
-  const cellErrors = cells.map((val, i) => {
+  const cellErrors = cells.map((val) => {
     if (val === '') return false
     const n = Number(val)
     if (n < 1 || n > 56) return true
