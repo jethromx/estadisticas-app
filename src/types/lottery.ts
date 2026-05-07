@@ -1,4 +1,4 @@
-export type LotteryTypeId = 'MELATE' | 'REVANCHA' | 'REVANCHITA' | 'GANA_GATO'
+export type LotteryTypeId = 'MELATE' | 'REVANCHA' | 'REVANCHITA'
 
 export type Methodology =
   | 'HOT_NUMBERS'
@@ -190,6 +190,7 @@ export interface SavedPredictionSet {
   savedAt:        string        // ISO datetime string
   latestDrawDate: string | null
   combos:         GeneratedCombo[]
+  lotteryType?:   string | null
 }
 
 export interface SavePredictionRequest {

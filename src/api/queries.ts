@@ -156,7 +156,13 @@ export function useSync(type: LotteryTypeId | 'ALL') {
   const qc = useQueryClient()
   return useMutation<SyncResult | SyncResult[]>({
     mutationFn: () => type === 'ALL' ? api.syncAll() : api.sync(type),
-    onSuccess:  () => qc.invalidateQueries(),
+    onSuccess: (data) => {
+      const results = Array.isArray(data) ? data : [data]
+      results.forEach(r => {
+        if (r.syncedAt) localStorage.setItem(`lastSync_${r.lotteryType}`, r.syncedAt)
+      })
+      qc.invalidateQueries()
+    },
   })
 }
 

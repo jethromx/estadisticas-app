@@ -8,7 +8,7 @@ import {
   useDueNumbers, useWindowedFrequencies,
   useBalanceAnalysis, useSumDistribution,
   usePairAnalysis, useChiSquare, useBacktest, useBayesianAnalysis,
-  useDrawResults, useSavePrediction, useNeuralPrediction,
+  useDrawResults, useSavePrediction,
 } from '@/api/queries'
 import { SuggestedCombosCard, buildCombo } from '@/components/SuggestedCombosCard'
 import type { SuggestedCombo } from '@/components/SuggestedCombosCard'
@@ -20,7 +20,7 @@ import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { cn, formatNumber } from '@/lib/utils'
 import type {
   LotteryTypeId, DueNumber, DrawResult, WindowedFrequency, BalanceAnalysis, SumDistribution,
-  NumberPair, ChiSquareResult, BacktestResult, BayesianNumber, GeneratedCombo, NeuralPrediction,
+  NumberPair, ChiSquareResult, BacktestResult, BayesianNumber, GeneratedCombo,
 } from '@/types/lottery'
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -2601,11 +2601,6 @@ export function ComparativePage() {
   const { data: bayRevancha,   isLoading: lby2 } = useBayesianAnalysis('REVANCHA',   50)
   const { data: bayRevanchita, isLoading: lby3 } = useBayesianAnalysis('REVANCHITA', 50)
 
-  // Neural MLP — loads independently per game
-  const { data: neuMelate,     isLoading: lnn1 } = useNeuralPrediction('MELATE')
-  const { data: neuRevancha,   isLoading: lnn2 } = useNeuralPrediction('REVANCHA')
-  const { data: neuRevanchita, isLoading: lnn3 } = useNeuralPrediction('REVANCHITA')
-
   // Only core data blocks the spinner
   const loading        = l1  || l2  || l3  || l4  || l5  || l6
   const arimaLoading   = la1 || la2 || la3 || la4 || la5 || la6
@@ -2614,7 +2609,6 @@ export function ComparativePage() {
   const chiLoading     = lc1 || lc2 || lc3
   const backtestLoading = lbt1 || lbt2 || lbt3
   const bayesLoading   = lby1 || lby2 || lby3
-  const neuralLoading  = lnn1 || lnn2 || lnn3
 
   const dueMap: Record<string, DueNumber[]> = {
     MELATE:     dueMelate     ?? [],
@@ -2752,7 +2746,6 @@ export function ComparativePage() {
           <TabsTrigger value="chisq">Chi²</TabsTrigger>
           <TabsTrigger value="arima">ARIMA</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
-          <TabsTrigger value="neural">Red Neuronal</TabsTrigger>
         </TabsList>
 
         {/* ── Tab: Consenso ── */}
@@ -3119,151 +3112,6 @@ export function ComparativePage() {
               REVANCHITA: drawsRevanchita ?? [],
             }}
           />
-        </TabsContent>
-
-        {/* ── Tab: Red Neuronal MLP ── */}
-        <TabsContent value="neural">
-          {(() => {
-            const neuMap: Record<string, NeuralPrediction | undefined> = {
-              MELATE: neuMelate, REVANCHA: neuRevancha, REVANCHITA: neuRevanchita,
-            }
-            if (neuralLoading) return (
-              <div className="flex flex-col items-center gap-3 py-16 text-center">
-                <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-300 border-t-violet-600" />
-                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Entrenando redes neuronales…</p>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  MLP 8→16→8→1 por juego · puede tardar ~10 s la primera vez (caché 6 h)
-                </p>
-              </div>
-            )
-
-            // SuggestedCombosCard — top-6 greedy de cada juego
-            const neuCombos: SuggestedCombo[] = GAMES
-              .filter(g => neuMap[g]?.suggestedCombos?.[0]?.length)
-              .map(g => ({
-                key:   `neu-${g}`,
-                title: `${GAME_LABEL[g]} — Neural top 6`,
-                desc:  `Val. hit rate: ${(neuMap[g]!.validationHitRate).toFixed(2)} aciertos/sorteo`,
-                color: GAME_COLOR[g],
-                label: `Neural ${GAME_LABEL[g]}`,
-                combo: buildCombo(neuMap[g]!.suggestedCombos[0]),
-              }))
-
-            return (
-              <div className="flex flex-col gap-6">
-
-                {/* Combinaciones guardables */}
-                {neuCombos.length > 0 && (
-                  <SuggestedCombosCard
-                    subtitle="Top 6 por probabilidad sigmoid de la red neuronal MLP entrenada por juego"
-                    combos={neuCombos}
-                    savedKey={savedComboKey}
-                    isPending={saveComboMutation.isPending}
-                    onSave={(key, combo, label) => {
-                      const game = (GAMES.find(g => key === `neu-${g}`) ?? 'MELATE') as LotteryTypeId
-                      handleComboSave(key, combo, label, game)
-                    }}
-                  />
-                )}
-
-                {/* Métricas y top-10 por juego */}
-                <div className="grid gap-4 sm:grid-cols-3">
-                  {GAMES.map(g => {
-                    const d = neuMap[g]
-                    if (!d) return (
-                      <div key={g} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 text-center text-xs text-zinc-400">
-                        {GAME_ICON[g]} {GAME_LABEL[g]} — sin datos
-                      </div>
-                    )
-                    const top10 = d.scoredNumbers.slice(0, 10)
-                    const maxP  = top10[0]?.probability ?? 1
-                    return (
-                      <div key={g} className="flex flex-col gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
-                        <div className="flex items-center justify-between">
-                          <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
-                            {GAME_ICON[g]} {GAME_LABEL[g]}
-                          </p>
-                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
-                            {d.validationHitRate.toFixed(2)} hits/sorteo
-                          </span>
-                        </div>
-                        <div className="flex flex-col gap-1">
-                          {top10.map((s, rank) => (
-                            <div key={s.number} className="flex items-center gap-2">
-                              <span className="w-4 text-[10px] text-zinc-400 shrink-0">{rank + 1}</span>
-                              <span
-                                className="w-7 h-7 shrink-0 flex items-center justify-center rounded-full font-bold text-xs text-white"
-                                style={{ background: GAME_COLOR[g] }}
-                              >
-                                {s.number}
-                              </span>
-                              <div className="flex-1 h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                                <div
-                                  className="h-full rounded-full"
-                                  style={{ width: `${(s.probability / maxP) * 100}%`, background: GAME_COLOR[g] }}
-                                />
-                              </div>
-                              <span className="text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400 shrink-0">
-                                {(s.probability * 100).toFixed(2)}%
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
-                          Entrenado con {d.trainingDraws} sorteos · {d.trainingEpochs} épocas
-                        </p>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Números con alta probabilidad en los 3 juegos */}
-                {(() => {
-                  const allReady = GAMES.every(g => neuMap[g]?.scoredNumbers?.length)
-                  if (!allReady) return null
-                  const topSets = Object.fromEntries(
-                    GAMES.map(g => [g, new Set(neuMap[g]!.scoredNumbers.slice(0, 12).map(s => s.number))])
-                  )
-                  const inAll3 = Array.from({ length: 56 }, (_, i) => i + 1)
-                    .filter(n => GAMES.every(g => topSets[g].has(n)))
-                    .sort((a, b) => {
-                      const avgA = GAMES.reduce((s, g) => s + (neuMap[g]!.scoredNumbers.find(x => x.number === a)?.probability ?? 0), 0)
-                      const avgB = GAMES.reduce((s, g) => s + (neuMap[g]!.scoredNumbers.find(x => x.number === b)?.probability ?? 0), 0)
-                      return avgB - avgA
-                    })
-                  if (!inAll3.length) return null
-                  return (
-                    <Card>
-                      <CardHeader>
-                        <CardTitle>Números en top-12 de los 3 juegos</CardTitle>
-                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                          Mayor señal neural: la red los ubica entre los más probables en Melate, Revancha y Revanchita simultáneamente.
-                        </p>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="flex flex-wrap gap-3">
-                          {inAll3.map(n => {
-                            const avgProb = GAMES.reduce((s, g) => s + (neuMap[g]!.scoredNumbers.find(x => x.number === n)?.probability ?? 0), 0) / 3
-                            return (
-                              <div key={n} className="flex flex-col items-center gap-1">
-                                <span className="inline-flex h-11 w-11 items-center justify-center rounded-full font-bold text-base text-white bg-violet-600">
-                                  {n}
-                                </span>
-                                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tabular-nums">
-                                  {(avgProb * 100).toFixed(2)}%
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })()}
-
-              </div>
-            )
-          })()}
         </TabsContent>
 
       </Tabs>

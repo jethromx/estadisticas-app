@@ -10,7 +10,7 @@ import {
   useDueNumbers, useWindowedFrequencies,
   useBalanceAnalysis, useSumDistribution, useSync,
   usePairAnalysis, useChiSquare, useBacktest, useBayesianAnalysis,
-  useSavePrediction, useNeuralPrediction, useDrawResults,
+  useSavePrediction,
 } from '@/api/queries'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -783,230 +783,6 @@ function SumDistributionTab({ dist, typeId }: { dist: SumDistribution; typeId: L
 
 const PAIR_LIMIT_OPTIONS = [20, 50, 100] as const
 
-// ── Panel de rendimiento inmediato post-guardado ─────────────────────────────
-
-function QuickMatchPanel({ numbers, draws, typeId }: {
-  numbers: number[]
-  draws: ReturnType<typeof useDrawResults>['data']
-  typeId: string
-}) {
-  if (!draws?.length) return null
-  const recent = draws.slice(0, 5)     // API devuelve desc, los 5 más recientes primero
-
-  return (
-    <div className="rounded-xl border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-900/10 px-4 py-3 flex flex-col gap-2">
-      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400">
-        Rendimiento en los 5 sorteos más recientes de {typeId}
-      </p>
-      <div className="flex flex-col gap-1.5">
-        {recent.map(draw => {
-          const matched = numbers.filter(n => draw.numbers.includes(n))
-          const count   = matched.length
-          return (
-            <div key={draw.drawNumber} className="flex items-center gap-3 text-xs">
-              <span className="text-zinc-400 w-24 shrink-0 tabular-nums">{draw.drawDate}</span>
-              <div className="flex gap-0.5">
-                {numbers.map(n => (
-                  <span
-                    key={n}
-                    className={matched.includes(n)
-                      ? 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-[9px] font-bold text-white'
-                      : 'inline-flex h-5 w-5 items-center justify-center rounded-full bg-zinc-100 dark:bg-zinc-800 text-[9px] font-semibold text-zinc-400'}
-                  >
-                    {n}
-                  </span>
-                ))}
-              </div>
-              <span className={
-                count >= 4 ? 'font-bold tabular-nums text-emerald-600 dark:text-emerald-400' :
-                count >= 3 ? 'font-bold tabular-nums text-amber-600 dark:text-amber-400' :
-                count >= 2 ? 'font-bold tabular-nums text-sky-600 dark:text-sky-400' :
-                'tabular-nums text-zinc-400'
-              }>
-                {count}/6
-              </span>
-            </div>
-          )
-        })}
-      </div>
-      <p className="text-[10px] text-zinc-400">
-        Verde = número acertado · estos sorteos son anteriores a tu predicción, sirven como referencia histórica inmediata
-      </p>
-    </div>
-  )
-}
-
-// ── Tab Red Neuronal ──────────────────────────────────────────────────────────
-
-function NeuralTab({ typeId }: { typeId: LotteryTypeId }) {
-  const { data, isLoading, isError } = useNeuralPrediction(typeId)
-  const { data: recentDraws }        = useDrawResults(typeId, 10)
-  const saveMutation = useSavePrediction()
-  const [savedKey,    setSavedKey]    = useState<string | null>(null)
-  const [savedNumbers, setSavedNumbers] = useState<number[] | null>(null)
-  const meta = getLotteryMeta(typeId)
-
-  if (isLoading) return (
-    <div className="flex flex-col items-center gap-3 py-16 text-center">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-300 border-t-violet-600" />
-      <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Entrenando red neuronal…</p>
-      <p className="text-xs text-zinc-500 dark:text-zinc-400">
-        MLP 8→16→8→1 · {typeId} · puede tardar ~10 s la primera vez (el resultado se cachea 6 h)
-      </p>
-    </div>
-  )
-  if (isError || !data) return (
-    <p className="text-sm text-zinc-500 py-8 text-center">
-      Error al calcular la predicción neural. Sincroniza el juego primero.
-    </p>
-  )
-
-  const combos = [
-    { key: 'nn-greedy',   title: 'Top 6 greedy',          desc: 'Los 6 números con mayor probabilidad sigmoid',              color: '#7c3aed', label: 'Neural greedy' },
-    { key: 'nn-balanced', title: 'Top 6 equilibrada',      desc: `3 impares + 3 pares del ranking neural`,                   color: '#0284c7', label: 'Neural equilibrada' },
-    { key: 'nn-hybrid',   title: 'Híbrida prob + due',     desc: '55% probabilidad neural + 45% due-score histórico',        color: '#059669', label: 'Neural híbrida' },
-  ].map((c, i) => ({
-    ...c,
-    combo: buildCombo(data.suggestedCombos[i] ?? []),
-  }))
-
-  const maxProb = data.scoredNumbers[0]?.probability ?? 1
-  const topNumbers = data.scoredNumbers.slice(0, 15)
-
-  return (
-    <div className="flex flex-col gap-4">
-
-      {/* Combinaciones sugeridas */}
-      <SuggestedCombosCard
-        subtitle={`Red neuronal MLP entrenada con ${data.trainingDraws} sorteos · validación: ${data.validationHitRate.toFixed(2)} aciertos/sorteo`}
-        combos={combos}
-        savedKey={savedKey}
-        isPending={saveMutation.isPending}
-        onSave={(key, combo, label) => {
-          saveMutation.mutate(
-            { label: `${label} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
-            { onSuccess: () => {
-                setSavedKey(key)
-                setSavedNumbers(combo.numbers)
-                setTimeout(() => setSavedKey(null), 2000)
-              },
-            },
-          )
-        }}
-      />
-
-      {/* Generar y comparar — rendimiento inmediato tras guardar */}
-      {savedNumbers && (
-        <QuickMatchPanel numbers={savedNumbers} draws={recentDraws} typeId={typeId} />
-      )}
-
-      {/* Métricas del modelo */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {[
-          { label: 'Sorteos analizados', value: data.totalDrawsAnalyzed.toLocaleString() },
-          { label: 'Sorteos entrenamiento', value: data.trainingDraws.toLocaleString() },
-          { label: 'Épocas', value: data.trainingEpochs },
-          { label: 'Aciertos / sorteo (val.)', value: data.validationHitRate.toFixed(2) },
-        ].map(({ label, value }) => (
-          <div key={label} className="rounded-lg bg-zinc-50 dark:bg-zinc-800/60 p-3 text-center">
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">{label}</p>
-            <p className="mt-1 text-lg font-bold text-zinc-900 dark:text-zinc-100">{value}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* Top 15 por probabilidad */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Top 15 — Probabilidad neural</CardTitle>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Score sigmoid de la red por número. La barra refleja la probabilidad relativa al máximo.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <div className="flex flex-col gap-1">
-            {topNumbers.map((s) => {
-              const pct   = maxProb > 0 ? (s.probability / maxProb) * 100 : 0
-              const trend = s.trend > 0.05 ? 'up' : s.trend < -0.05 ? 'down' : 'flat'
-              return (
-                <div key={s.number} className="flex items-center gap-2 py-1.5 border-b border-zinc-50 dark:border-zinc-800/60 last:border-0">
-                  <span className="w-5 text-right text-[10px] text-zinc-400 shrink-0">{s.rank}</span>
-                  <span className="w-9 h-9 shrink-0 flex items-center justify-center rounded-full font-bold text-sm text-white bg-violet-600">
-                    {s.number}
-                  </span>
-                  <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                    <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-                      <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: `${pct}%` }} />
-                    </div>
-                    <div className="flex gap-3 text-[10px] text-zinc-400">
-                      <span>freq50: <b className="text-zinc-600 dark:text-zinc-300">{(s.recentFreq50 * 100).toFixed(1)}%</b></span>
-                      <span>due: <b className="text-zinc-600 dark:text-zinc-300">{(s.dueScore * 4).toFixed(2)}</b></span>
-                    </div>
-                  </div>
-                  <span className="w-16 text-right tabular-nums text-xs font-bold text-violet-700 dark:text-violet-300 shrink-0">
-                    {(s.probability * 100).toFixed(3)}%
-                  </span>
-                  <span className={`w-6 text-xs shrink-0 ${trend === 'up' ? 'text-emerald-500' : trend === 'down' ? 'text-red-400' : 'text-zinc-400'}`}>
-                    {trend === 'up' ? '▲' : trend === 'down' ? '▼' : '─'}
-                  </span>
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Grid de todos los números */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Mapa de probabilidad — {meta.label}</CardTitle>
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">
-            Intensidad del color = probabilidad relativa. Borde dorado = top-6 seleccionados.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {(() => {
-            const top6 = new Set(combos[0].combo.numbers)
-            return (
-              <div className="grid grid-cols-8 sm:grid-cols-10 md:grid-cols-14 gap-1.5">
-                {data.scoredNumbers.map(s => {
-                  const norm = maxProb > 0 ? s.probability / maxProb : 0
-                  const inTop6 = top6.has(s.number)
-                  return (
-                    <div
-                      key={s.number}
-                      title={`Nº${s.number} · prob ${(s.probability * 100).toFixed(3)}% · rank #${s.rank}`}
-                      className={`flex items-center justify-center rounded-lg text-xs font-bold aspect-square cursor-default select-none transition-all
-                        ${inTop6 ? 'ring-2 ring-offset-1 ring-amber-400 dark:ring-offset-zinc-900' : ''}
-                        ${norm > 0.75 ? 'bg-violet-700 text-white'
-                          : norm > 0.50 ? 'bg-violet-500 text-white'
-                          : norm > 0.25 ? 'bg-violet-300 text-violet-900'
-                          : 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400'}`}
-                    >
-                      {s.number}
-                    </div>
-                  )
-                })}
-              </div>
-            )
-          })()}
-        </CardContent>
-      </Card>
-
-      {/* Metodología */}
-      <Card className="border-dashed">
-        <CardContent className="pt-5">
-          <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
-            <b className="text-zinc-600 dark:text-zinc-300">Metodología:</b>{' '}
-            {data.methodDescription}
-          </p>
-        </CardContent>
-      </Card>
-
-    </div>
-  )
-}
-
 function PairAnalysisTab({ typeId }: { typeId: LotteryTypeId }) {
   const [limit, setLimit] = useState<number>(20)
   const { data, isLoading } = usePairAnalysis(typeId, limit)
@@ -1500,7 +1276,6 @@ export function GamePage() {
           <TabsTrigger value="bayesian">Bayesiano</TabsTrigger>
           <TabsTrigger value="backtest">Backtest</TabsTrigger>
           <TabsTrigger value="chisq">Chi²</TabsTrigger>
-          <TabsTrigger value="neural">Red Neuronal</TabsTrigger>
         </TabsList>
 
         {/* ── Por salir ── */}
@@ -1815,10 +1590,6 @@ export function GamePage() {
             : <p className="text-sm text-zinc-500">Sin datos. Sincroniza primero.</p>}
         </TabsContent>
 
-        {/* ── Red Neuronal MLP ── */}
-        <TabsContent value="neural">
-          <NeuralTab typeId={typeId} />
-        </TabsContent>
 
       </Tabs>
     </div>

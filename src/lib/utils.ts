@@ -10,7 +10,6 @@ export const LOTTERY_TYPES: LotteryTypeMeta[] = [
   { id: 'MELATE',     label: 'Melate',     icon: '🟣', color: '#7c3aed', range: '1–56', numbers: 6 },
   { id: 'REVANCHA',   label: 'Revancha',   icon: '🔵', color: '#0ea5e9', range: '1–56', numbers: 6 },
   { id: 'REVANCHITA', label: 'Revanchita', icon: '🟢', color: '#10b981', range: '1–56', numbers: 6 },
-  { id: 'GANA_GATO',  label: 'Gana Gato',  icon: '🐱', color: '#f59e0b', range: '1–5',  numbers: 8 },
 ]
 
 export function getLotteryMeta(id: string): LotteryTypeMeta {

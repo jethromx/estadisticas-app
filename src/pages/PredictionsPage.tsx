@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   LineChart, Line, XAxis, YAxis,
@@ -589,6 +589,20 @@ export function PredictionsPage() {
     )
   }
 
+  // Auto-analyze when expanding a prediction that has new draws and no result yet
+  useEffect(() => {
+    if (!expandedSetId) return
+    const set = savedSets.find(s => s.id === expandedSetId)
+    if (!set) return
+    const hasNewDraws = GAMES.some(g =>
+      (drawsMap[g] ?? []).some(d => !set.latestDrawDate || d.drawDate > set.latestDrawDate)
+    )
+    if (hasNewDraws && !analysisResults[expandedSetId] && !analysisErrors[expandedSetId] && analyzingId !== expandedSetId) {
+      analyzeSet(expandedSetId)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [expandedSetId])
+
   const virtualizer = useVirtualizer({
     count: savedSets.length,
     getScrollElement: () => listRef.current,
@@ -702,7 +716,7 @@ export function PredictionsPage() {
                 className="ml-3 rounded-lg border border-violet-200 dark:border-violet-800 px-2.5 py-1 text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/30 disabled:opacity-50 transition-colors"
                 title="Analizar precisión vs sorteos posteriores"
               >
-                {analyzingId === set.id ? '…' : '⚡ Analizar'}
+                {analyzingId === set.id ? '…' : analysisResults[set.id] ? '↺ Re-analizar' : '⚡ Analizar'}
               </button>
               <button
                 onClick={() => deleteSet(set.id)}
