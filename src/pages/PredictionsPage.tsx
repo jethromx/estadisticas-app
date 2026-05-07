@@ -2,14 +2,14 @@ import { useState, useRef, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   useSavedPredictions, useDeletePrediction,
-  useAnalyzePrediction, useDrawResults,
+  useAnalyzePrediction, useDrawResults, useSavePrediction,
 } from '@/api/queries'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { CombinationGenerator } from '@/components/CombinationGenerator'
 import { cn } from '@/lib/utils'
 import type {
-  LotteryTypeId, DrawResult, PredictionAccuracyResult,
+  LotteryTypeId, DrawResult, PredictionAccuracyResult, GeneratedCombo,
 } from '@/types/lottery'
 
 const GAMES: LotteryTypeId[] = ['MELATE', 'REVANCHA', 'REVANCHITA']
@@ -247,6 +247,216 @@ function ComboLookup({ drawsMap }: { drawsMap: Record<string, DrawResult[]> }) {
   )
 }
 
+const LOTTERY_OPTIONS: LotteryTypeId[] = ['MELATE', 'REVANCHA', 'REVANCHITA']
+const EMPTY_SCORES: GeneratedCombo['scores'] = { due: 0, bayes: 0, arima: 0, backtest: 0, pairs: 0, consensus: 0 }
+
+function ManualComboCreator() {
+  const [open,        setOpen]        = useState(false)
+  const [label,       setLabel]       = useState('')
+  const [gameType,    setGameType]    = useState<LotteryTypeId>('MELATE')
+  const [combos,      setCombos]      = useState<string[][]>([Array(6).fill('')])
+  const [error,       setError]       = useState<string | null>(null)
+  const [savedOk,     setSavedOk]     = useState(false)
+  const cellRefs = useRef<(HTMLInputElement | null)[][]>([[]])
+  const saveMutation = useSavePrediction()
+
+  // ensure ref array matches combo count
+  if (cellRefs.current.length !== combos.length) {
+    cellRefs.current = combos.map((_, ci) => cellRefs.current[ci] ?? Array(6).fill(null))
+  }
+
+  function updateCell(ci: number, idx: number, raw: string) {
+    const val = raw.replace(/\D/g, '').slice(0, 2)
+    setCombos(prev => prev.map((row, r) => r === ci ? row.map((v, j) => j === idx ? val : v) : row))
+    setError(null)
+    setSavedOk(false)
+    if (val.length === 2 && idx < 5) cellRefs.current[ci]?.[idx + 1]?.focus()
+  }
+
+  function handleKey(ci: number, idx: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Backspace' && combos[ci][idx] === '' && idx > 0)
+      cellRefs.current[ci]?.[idx - 1]?.focus()
+    if (e.key === 'Enter') save()
+  }
+
+  function handlePaste(ci: number, e: React.ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault()
+    const nums = e.clipboardData.getData('text').split(/[\s,\-]+/).map(Number).filter(n => n >= 1 && n <= 56)
+    if (nums.length >= 1) {
+      setCombos(prev => prev.map((row, r) =>
+        r === ci ? row.map((_, j) => nums[j] != null ? String(nums[j]) : '') : row
+      ))
+      const last = Math.min(nums.length - 1, 5)
+      cellRefs.current[ci]?.[last]?.focus()
+    }
+  }
+
+  function addCombo() {
+    if (combos.length >= 5) return
+    cellRefs.current.push(Array(6).fill(null))
+    setCombos(prev => [...prev, Array(6).fill('')])
+  }
+
+  function removeCombo(ci: number) {
+    if (combos.length <= 1) return
+    cellRefs.current.splice(ci, 1)
+    setCombos(prev => prev.filter((_, r) => r !== ci))
+  }
+
+  function reset() {
+    setCombos([Array(6).fill('')])
+    cellRefs.current = [[]]
+    setLabel('')
+    setError(null)
+    setSavedOk(false)
+  }
+
+  function save() {
+    if (!label.trim()) { setError('Escribe un nombre para esta predicción'); return }
+    for (let ci = 0; ci < combos.length; ci++) {
+      if (combos[ci].some(v => v === '')) { setError(`Combinación #${ci + 1}: faltan números`); return }
+      const nums = combos[ci].map(Number)
+      if (nums.some(n => n < 1 || n > 56)) { setError(`Combinación #${ci + 1}: número fuera de rango 1–56`); return }
+      if (new Set(nums).size !== 6)         { setError(`Combinación #${ci + 1}: hay números repetidos`); return }
+    }
+
+    const builtCombos: GeneratedCombo[] = combos.map(cells => {
+      const numbers = cells.map(Number).sort((a, b) => a - b)
+      return { numbers, sum: numbers.reduce((a, b) => a + b, 0), inRange: true, wasDrawn: false, scores: EMPTY_SCORES }
+    })
+
+    saveMutation.mutate(
+      { label: label.trim(), latestDrawDate: null, combos: builtCombos, lotteryType: gameType },
+      {
+        onSuccess: () => { setSavedOk(true); reset(); setTimeout(() => { setSavedOk(false); setOpen(false) }, 1800) },
+        onError:   (err) => setError(err instanceof Error ? err.message : 'Error al guardar'),
+      },
+    )
+  }
+
+  return (
+    <Card>
+      {/* Header — toggle */}
+      <button
+        className="w-full text-left"
+        onClick={() => { setOpen(o => !o); setError(null) }}
+      >
+        <CardHeader className="flex flex-row items-center justify-between py-3">
+          <CardTitle className="text-sm font-semibold flex items-center gap-2">
+            ✏️ Ingresar combinación manual
+          </CardTitle>
+          <span className="text-zinc-400 text-xs">{open ? '▲ cerrar' : '▼ abrir'}</span>
+        </CardHeader>
+      </button>
+
+      {open && (
+        <CardContent className="pt-0 flex flex-col gap-4">
+
+          {/* Label + type */}
+          <div className="flex flex-col sm:flex-row gap-3">
+            <input
+              value={label}
+              onChange={e => { setLabel(e.target.value); setError(null) }}
+              placeholder="Nombre de la predicción…"
+              className="flex-1 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-3 py-2 text-sm text-zinc-800 dark:text-zinc-100 placeholder:text-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-400"
+            />
+            <div className="flex rounded-lg overflow-hidden border border-zinc-200 dark:border-zinc-700 shrink-0">
+              {LOTTERY_OPTIONS.map(opt => (
+                <button
+                  key={opt}
+                  onClick={() => setGameType(opt)}
+                  className={cn(
+                    'px-3 py-2 text-xs font-semibold transition-colors',
+                    gameType === opt
+                      ? 'bg-violet-600 text-white'
+                      : 'bg-white dark:bg-zinc-900 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800',
+                  )}
+                >
+                  {GAME_LABELS[opt]}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Combo rows */}
+          <div className="flex flex-col gap-3">
+            {combos.map((row, ci) => {
+              const nums = row.map(Number)
+              const filled = row.filter(v => v !== '')
+              const dupes = new Set(nums.filter((n, i) => nums.indexOf(n) !== i && row[i] !== ''))
+              return (
+                <div key={ci} className="flex items-center gap-2 flex-wrap">
+                  <span className="text-[10px] text-zinc-400 w-5 shrink-0 text-right">#{ci + 1}</span>
+                  <div className="flex gap-1.5">
+                    {row.map((val, idx) => {
+                      const n = Number(val)
+                      const hasErr = val !== '' && (n < 1 || n > 56 || dupes.has(n))
+                      return (
+                        <input
+                          key={idx}
+                          ref={el => { if (!cellRefs.current[ci]) cellRefs.current[ci] = []; cellRefs.current[ci][idx] = el }}
+                          value={val}
+                          inputMode="numeric"
+                          onChange={e => updateCell(ci, idx, e.target.value)}
+                          onKeyDown={e => handleKey(ci, idx, e)}
+                          onPaste={e => handlePaste(ci, e)}
+                          className={cn(
+                            'w-10 h-10 text-center rounded-lg border text-sm font-bold focus:outline-none focus:ring-2',
+                            hasErr
+                              ? 'border-red-400 bg-red-50 dark:bg-red-900/20 text-red-600 focus:ring-red-400'
+                              : 'border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 focus:ring-violet-400',
+                          )}
+                        />
+                      )
+                    })}
+                  </div>
+                  {filled.length === 6 && !row.some(v => { const n = Number(v); return n < 1 || n > 56 }) && (
+                    <span className="text-[10px] text-zinc-400 ml-1">
+                      Σ {nums.reduce((a, b) => a + b, 0)}
+                    </span>
+                  )}
+                  {combos.length > 1 && (
+                    <button
+                      onClick={() => removeCombo(ci)}
+                      className="ml-auto text-zinc-300 hover:text-red-500 transition-colors text-base"
+                      title="Eliminar esta combinación"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Actions */}
+          <div className="flex items-center gap-3 flex-wrap">
+            {combos.length < 5 && (
+              <button
+                onClick={addCombo}
+                className="text-xs text-violet-600 dark:text-violet-400 hover:underline"
+              >
+                + Añadir combinación
+              </button>
+            )}
+            <div className="flex-1" />
+            {error && <p className="text-xs text-red-500">{error}</p>}
+            {savedOk && <p className="text-xs text-emerald-600 font-medium">✓ Guardada</p>}
+            <button
+              onClick={save}
+              disabled={saveMutation.isPending}
+              className="rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white text-xs font-semibold px-4 py-2 transition-colors"
+            >
+              {saveMutation.isPending ? 'Guardando…' : 'Guardar predicción'}
+            </button>
+          </div>
+
+        </CardContent>
+      )}
+    </Card>
+  )
+}
+
 export function PredictionsPage() {
   const { data: savedSets = [], isLoading: savedSetsLoading } = useSavedPredictions()
 
@@ -313,6 +523,9 @@ export function PredictionsPage() {
 
       {/* Manual combo lookup */}
       <ComboLookup drawsMap={drawsMap} />
+
+      {/* Manual combination creator */}
+      <ManualComboCreator />
 
       {/* Saved predictions header */}
       <div className="flex items-center gap-3 pt-2">
