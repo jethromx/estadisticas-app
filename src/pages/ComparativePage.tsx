@@ -1,4 +1,4 @@
-import { Fragment, useMemo } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import {
   LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer,
   Legend, CartesianGrid, ReferenceLine,
@@ -8,8 +8,10 @@ import {
   useDueNumbers, useWindowedFrequencies,
   useBalanceAnalysis, useSumDistribution,
   usePairAnalysis, useChiSquare, useBacktest, useBayesianAnalysis,
-  useDrawResults,
+  useDrawResults, useSavePrediction, useNeuralPrediction,
 } from '@/api/queries'
+import { SuggestedCombosCard, buildCombo } from '@/components/SuggestedCombosCard'
+import type { SuggestedCombo } from '@/components/SuggestedCombosCard'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { PageSpinner } from '@/components/ui/spinner'
@@ -18,7 +20,7 @@ import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { cn, formatNumber } from '@/lib/utils'
 import type {
   LotteryTypeId, DueNumber, DrawResult, WindowedFrequency, BalanceAnalysis, SumDistribution,
-  NumberPair, ChiSquareResult, BacktestResult, BayesianNumber,
+  NumberPair, ChiSquareResult, BacktestResult, BayesianNumber, GeneratedCombo, NeuralPrediction,
 } from '@/types/lottery'
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -51,6 +53,8 @@ interface NumberScore {
 function computeScores(
   dueMap:   Record<string, DueNumber[]>,
   trendMap: Record<string, WindowedFrequency[]>,
+  wDue = 0.65,
+  wTrend = 0.35,
 ): NumberScore[] {
   const maxDue = Object.fromEntries(
     GAMES.map(g => [g, Math.max(...(dueMap[g]?.map(d => d.dueScore) ?? [1]), 0.01)]),
@@ -69,7 +73,7 @@ function computeScores(
     const totalScore = details.reduce((sum, { game, dueScore, trend }) => {
       const normDue   = dueScore / maxDue[game]
       const normTrend = Math.max(trend, 0) / maxPosTrend[game]
-      return sum + normDue * 0.65 + normTrend * 0.35
+      return sum + normDue * wDue + normTrend * wTrend
     }, 0)
 
     const gamesInTop10 = GAMES.filter(game => {
@@ -463,6 +467,41 @@ function DueComparison({ dueMap }: { dueMap: Record<string, DueNumber[]> }) {
 
   return (
     <div className="flex flex-col gap-6">
+
+      {/* ── Suggested numbers per game ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Números sugeridos para el próximo sorteo</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Top 6 números con mayor deuda en cada juego — los que llevan más tiempo sin salir respecto a su intervalo histórico.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 sm:grid-cols-3">
+            {GAMES.map(g => (
+              <div key={g} className="flex flex-col gap-3">
+                <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                  {GAME_ICON[g]} {GAME_LABEL[g]}
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {tops[g].slice(0, 6).map((dn, rank) => (
+                    <div key={dn.number} className="flex flex-col items-center gap-0.5">
+                      <span
+                        className="w-11 h-11 flex items-center justify-center rounded-full font-bold text-base text-white shadow-md"
+                        style={{ background: GAME_COLOR[g] }}
+                        title={`dueScore: ${dn.dueScore.toFixed(2)} · ${dn.drawsSinceLast} sorteos sin salir`}
+                      >
+                        {dn.number}
+                      </span>
+                      <span className="text-[9px] text-zinc-400 tabular-nums">#{rank + 1}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── Heatmap grid ── */}
       <Card>
@@ -2320,13 +2359,13 @@ function ComparativeSuggestions({
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-2">
+                      <div className="flex flex-wrap gap-4">
                         {prop.numbers.map(n => {
                           const votes = megaVoteMap[n] ?? 0
                           const norm  = votes / maxVotes
                           return (
                             <Tip key={n} content={`Nº${n} — respaldado por ${votes} de ${totalSources} listas`}>
-                              <div className="flex flex-col items-center gap-0.5">
+                              <div className="flex flex-col items-center gap-1.5">
                                 <span
                                   className={cn(
                                     'inline-flex h-12 w-12 items-center justify-center rounded-full font-bold text-lg text-white cursor-help shadow-sm',
@@ -2340,7 +2379,7 @@ function ComparativeSuggestions({
                                 >
                                   {n}
                                 </span>
-                                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tabular-nums">
+                                <span className="text-xs text-zinc-500 dark:text-zinc-400 tabular-nums">
                                   {votes}/{totalSources}
                                 </span>
                               </div>
@@ -2562,6 +2601,11 @@ export function ComparativePage() {
   const { data: bayRevancha,   isLoading: lby2 } = useBayesianAnalysis('REVANCHA',   50)
   const { data: bayRevanchita, isLoading: lby3 } = useBayesianAnalysis('REVANCHITA', 50)
 
+  // Neural MLP — loads independently per game
+  const { data: neuMelate,     isLoading: lnn1 } = useNeuralPrediction('MELATE')
+  const { data: neuRevancha,   isLoading: lnn2 } = useNeuralPrediction('REVANCHA')
+  const { data: neuRevanchita, isLoading: lnn3 } = useNeuralPrediction('REVANCHITA')
+
   // Only core data blocks the spinner
   const loading        = l1  || l2  || l3  || l4  || l5  || l6
   const arimaLoading   = la1 || la2 || la3 || la4 || la5 || la6
@@ -2570,6 +2614,7 @@ export function ComparativePage() {
   const chiLoading     = lc1 || lc2 || lc3
   const backtestLoading = lbt1 || lbt2 || lbt3
   const bayesLoading   = lby1 || lby2 || lby3
+  const neuralLoading  = lnn1 || lnn2 || lnn3
 
   const dueMap: Record<string, DueNumber[]> = {
     MELATE:     dueMelate     ?? [],
@@ -2614,10 +2659,14 @@ export function ComparativePage() {
 
   const hasData = GAMES.every(g => dueMap[g].length > 0 && trendMap[g].length > 0)
 
+  const [wDuePct, setWDuePct] = useState(65)
+  const wDue   = wDuePct / 100
+  const wTrend = 1 - wDue
+
   const scores = useMemo(
-    () => hasData ? computeScores(dueMap, trendMap) : [],
+    () => hasData ? computeScores(dueMap, trendMap, wDue, wTrend) : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [hasData, dueMelate, dueRevancha, dueRevanchita, wfMelate, wfRevancha, wfRevanchita],
+    [hasData, dueMelate, dueRevancha, dueRevanchita, wfMelate, wfRevancha, wfRevanchita, wDue, wTrend],
   )
 
   const rankedScores = useMemo(
@@ -2650,6 +2699,15 @@ export function ComparativePage() {
     const even = ranked.filter(n => n % 2 === 0).slice(0, 3)
     return [...odd, ...even].sort((a, b) => a - b)
   }, [arimaForecasts])
+
+  const saveComboMutation = useSavePrediction()
+  const [savedComboKey, setSavedComboKey] = useState<string | null>(null)
+  function handleComboSave(key: string, combo: GeneratedCombo, label: string, lotteryType: LotteryTypeId = 'MELATE') {
+    saveComboMutation.mutate(
+      { label: `Comparativo — ${label}`, latestDrawDate: null, combos: [combo], lotteryType },
+      { onSuccess: () => { setSavedComboKey(key); setTimeout(() => setSavedComboKey(null), 2000) } },
+    )
+  }
 
   if (loading) return <PageSpinner />
 
@@ -2694,11 +2752,56 @@ export function ComparativePage() {
           <TabsTrigger value="chisq">Chi²</TabsTrigger>
           <TabsTrigger value="arima">ARIMA</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
+          <TabsTrigger value="neural">Red Neuronal</TabsTrigger>
         </TabsList>
 
         {/* ── Tab: Consenso ── */}
         <TabsContent value="consenso">
           <div className="flex flex-col gap-6">
+
+            {/* Weight sliders */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-sm">Ponderación del score</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center gap-3">
+                    <span className="w-28 text-xs text-zinc-500 dark:text-zinc-400 shrink-0">
+                      Por salir <span className="font-bold text-violet-600">{wDuePct}%</span>
+                    </span>
+                    <input
+                      type="range" min={0} max={100} step={5} value={wDuePct}
+                      onChange={e => setWDuePct(Number(e.target.value))}
+                      className="flex-1 accent-violet-600"
+                    />
+                    <span className="w-28 text-right text-xs text-zinc-500 dark:text-zinc-400 shrink-0">
+                      Tendencia <span className="font-bold text-sky-600">{100 - wDuePct}%</span>
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-zinc-400 dark:text-zinc-500">
+                    Mueve el slider para cambiar cuánto peso tiene el due-score vs la tendencia reciente en el ranking.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {combinedSuggestion.length > 0 && (() => {
+              const top6Raw = rankedScores.slice(0, 6).map(s => s.number).sort((a, b) => a - b)
+              const combos: SuggestedCombo[] = [
+                { key: 'consensus-balanced', title: 'Top consenso equilibrado', desc: '3 impares + 3 pares con mayor score combinado due + tendencia', color: '#7c3aed', label: 'Top consenso equilibrado', combo: buildCombo(combinedSuggestion) },
+                { key: 'consensus-raw',      title: 'Top 6 por score puro',     desc: 'Los 6 números con mayor score de consenso sin restricción de balance', color: '#6366f1', label: 'Top 6 por score puro',     combo: buildCombo(top6Raw) },
+              ]
+              return (
+                <SuggestedCombosCard
+                  subtitle="Combinaciones derivadas del score de consenso entre los 3 juegos (due 65% + tendencia 35%)"
+                  combos={combos}
+                  savedKey={savedComboKey}
+                  isPending={saveComboMutation.isPending}
+                  onSave={(key, combo, label) => handleComboSave(key, combo, label)}
+                />
+              )
+            })()}
 
             <Card>
               <CardHeader>
@@ -2750,7 +2853,30 @@ export function ComparativePage() {
 
         {/* ── Tab: Por salir ── */}
         <TabsContent value="due">
-          <DueComparison dueMap={dueMap} />
+          <div className="flex flex-col gap-6">
+            {(() => {
+              const combos: SuggestedCombo[] = GAMES
+                .filter(g => (dueMap[g]?.length ?? 0) >= 6)
+                .map(g => {
+                  const top6 = [...dueMap[g]].sort((a, b) => b.dueScore - a.dueScore).slice(0, 6).map(d => d.number)
+                  return { key: `due-${g}`, title: `${GAME_LABEL[g]} — Por salir`, desc: `Top 6 números con mayor deuda en ${GAME_LABEL[g]}`, color: GAME_COLOR[g], label: `Por salir ${GAME_LABEL[g]}`, combo: buildCombo(top6) }
+                })
+              if (!combos.length) return null
+              return (
+                <SuggestedCombosCard
+                  subtitle="Top 6 números con mayor dueScore (sorteos sin salir ÷ intervalo histórico) por juego"
+                  combos={combos}
+                  savedKey={savedComboKey}
+                  isPending={saveComboMutation.isPending}
+                  onSave={(key, combo, label) => {
+                    const game = (GAMES.find(g => key === `due-${g}`) ?? 'MELATE') as LotteryTypeId
+                    handleComboSave(key, combo, label, game)
+                  }}
+                />
+              )
+            })()}
+            <DueComparison dueMap={dueMap} />
+          </div>
         </TabsContent>
 
         {/* ── Tab: Distribución ── */}
@@ -2810,6 +2936,34 @@ export function ComparativePage() {
 
         {/* ── Tab: Pares ── */}
         <TabsContent value="pares">
+          {!pairsLoading && (() => {
+            const combos: SuggestedCombo[] = GAMES
+              .filter(g => (pairsMap[g]?.length ?? 0) > 0)
+              .map(g => {
+                const freq: Record<number, number> = {}
+                pairsMap[g]!.slice(0, 15).forEach(p => {
+                  freq[p.number1] = (freq[p.number1] ?? 0) + p.frequency
+                  freq[p.number2] = (freq[p.number2] ?? 0) + p.frequency
+                })
+                const top6 = Object.entries(freq).sort(([, a], [, b]) => b - a).slice(0, 6).map(([n]) => Number(n))
+                return { key: `pares-${g}`, title: `${GAME_LABEL[g]} — Co-ocurrencia`, desc: `Top 6 números más conectados en pares frecuentes de ${GAME_LABEL[g]}`, color: GAME_COLOR[g], label: `Co-ocurrencia ${GAME_LABEL[g]}`, combo: buildCombo(top6) }
+              })
+            if (!combos.length) return null
+            return (
+              <div className="mb-4">
+                <SuggestedCombosCard
+                  subtitle="Números que aparecen con mayor frecuencia acumulada en los top-15 pares de cada juego"
+                  combos={combos}
+                  savedKey={savedComboKey}
+                  isPending={saveComboMutation.isPending}
+                  onSave={(key, combo, label) => {
+                    const game = (GAMES.find(g => key === `pares-${g}`) ?? 'MELATE') as LotteryTypeId
+                    handleComboSave(key, combo, label, game)
+                  }}
+                />
+              </div>
+            )
+          })()}
           <Card>
             <CardHeader>
               <CardTitle>Co-ocurrencia de Pares — Top 15 por juego</CardTitle>
@@ -2829,6 +2983,29 @@ export function ComparativePage() {
 
         {/* ── Tab: Bayesiano ── */}
         <TabsContent value="bayesiano">
+          {!bayesLoading && (() => {
+            const combos: SuggestedCombo[] = GAMES
+              .filter(g => (bayesMap[g]?.length ?? 0) >= 6)
+              .map(g => {
+                const top6 = [...bayesMap[g]!].sort((a, b) => b.posteriorMean - a.posteriorMean).slice(0, 6).map(b => b.number)
+                return { key: `bayes-${g}`, title: `${GAME_LABEL[g]} — Posterior`, desc: `Top 6 por probabilidad posterior bayesiana en ${GAME_LABEL[g]}`, color: GAME_COLOR[g], label: `Bayesiano ${GAME_LABEL[g]}`, combo: buildCombo(top6) }
+              })
+            if (!combos.length) return null
+            return (
+              <div className="mb-4">
+                <SuggestedCombosCard
+                  subtitle="Top 6 números con mayor probabilidad posterior (prior uniforme actualizado con los últimos 50 sorteos)"
+                  combos={combos}
+                  savedKey={savedComboKey}
+                  isPending={saveComboMutation.isPending}
+                  onSave={(key, combo, label) => {
+                    const game = (GAMES.find(g => key === `bayes-${g}`) ?? 'MELATE') as LotteryTypeId
+                    handleComboSave(key, combo, label, game)
+                  }}
+                />
+              </div>
+            )
+          })()}
           <Card>
             <CardHeader>
               <CardTitle>Análisis Bayesiano Comparado</CardTitle>
@@ -2849,6 +3026,29 @@ export function ComparativePage() {
 
         {/* ── Tab: Backtest ── */}
         <TabsContent value="backtest">
+          {!backtestLoading && (() => {
+            const combos: SuggestedCombo[] = GAMES
+              .filter(g => (backtestMap[g]?.predictedNumbers?.length ?? 0) >= 6)
+              .map(g => {
+                const nums = backtestMap[g]!.predictedNumbers.slice(0, 6)
+                return { key: `bt-${g}`, title: `${GAME_LABEL[g]} — Predichos`, desc: `Top ${nums.length} predichos por backtest en ${GAME_LABEL[g]}`, color: GAME_COLOR[g], label: `Backtest ${GAME_LABEL[g]}`, combo: buildCombo(nums) }
+              })
+            if (!combos.length) return null
+            return (
+              <div className="mb-4">
+                <SuggestedCombosCard
+                  subtitle="Números que el backtest predice con mayor hit rate sobre los últimos 100 sorteos"
+                  combos={combos}
+                  savedKey={savedComboKey}
+                  isPending={saveComboMutation.isPending}
+                  onSave={(key, combo, label) => {
+                    const game = (GAMES.find(g => key === `bt-${g}`) ?? 'MELATE') as LotteryTypeId
+                    handleComboSave(key, combo, label, game)
+                  }}
+                />
+              </div>
+            )
+          })()}
           <Card>
             <CardHeader>
               <CardTitle>Backtest de Hit Rate — Comparativa</CardTitle>
@@ -2919,6 +3119,151 @@ export function ComparativePage() {
               REVANCHITA: drawsRevanchita ?? [],
             }}
           />
+        </TabsContent>
+
+        {/* ── Tab: Red Neuronal MLP ── */}
+        <TabsContent value="neural">
+          {(() => {
+            const neuMap: Record<string, NeuralPrediction | undefined> = {
+              MELATE: neuMelate, REVANCHA: neuRevancha, REVANCHITA: neuRevanchita,
+            }
+            if (neuralLoading) return (
+              <div className="flex flex-col items-center gap-3 py-16 text-center">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-violet-300 border-t-violet-600" />
+                <p className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Entrenando redes neuronales…</p>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  MLP 8→16→8→1 por juego · puede tardar ~10 s la primera vez (caché 6 h)
+                </p>
+              </div>
+            )
+
+            // SuggestedCombosCard — top-6 greedy de cada juego
+            const neuCombos: SuggestedCombo[] = GAMES
+              .filter(g => neuMap[g]?.suggestedCombos?.[0]?.length)
+              .map(g => ({
+                key:   `neu-${g}`,
+                title: `${GAME_LABEL[g]} — Neural top 6`,
+                desc:  `Val. hit rate: ${(neuMap[g]!.validationHitRate).toFixed(2)} aciertos/sorteo`,
+                color: GAME_COLOR[g],
+                label: `Neural ${GAME_LABEL[g]}`,
+                combo: buildCombo(neuMap[g]!.suggestedCombos[0]),
+              }))
+
+            return (
+              <div className="flex flex-col gap-6">
+
+                {/* Combinaciones guardables */}
+                {neuCombos.length > 0 && (
+                  <SuggestedCombosCard
+                    subtitle="Top 6 por probabilidad sigmoid de la red neuronal MLP entrenada por juego"
+                    combos={neuCombos}
+                    savedKey={savedComboKey}
+                    isPending={saveComboMutation.isPending}
+                    onSave={(key, combo, label) => {
+                      const game = (GAMES.find(g => key === `neu-${g}`) ?? 'MELATE') as LotteryTypeId
+                      handleComboSave(key, combo, label, game)
+                    }}
+                  />
+                )}
+
+                {/* Métricas y top-10 por juego */}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  {GAMES.map(g => {
+                    const d = neuMap[g]
+                    if (!d) return (
+                      <div key={g} className="rounded-lg border border-zinc-200 dark:border-zinc-800 p-4 text-center text-xs text-zinc-400">
+                        {GAME_ICON[g]} {GAME_LABEL[g]} — sin datos
+                      </div>
+                    )
+                    const top10 = d.scoredNumbers.slice(0, 10)
+                    const maxP  = top10[0]?.probability ?? 1
+                    return (
+                      <div key={g} className="flex flex-col gap-3 rounded-lg border border-zinc-200 dark:border-zinc-800 p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">
+                            {GAME_ICON[g]} {GAME_LABEL[g]}
+                          </p>
+                          <span className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                            {d.validationHitRate.toFixed(2)} hits/sorteo
+                          </span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          {top10.map((s, rank) => (
+                            <div key={s.number} className="flex items-center gap-2">
+                              <span className="w-4 text-[10px] text-zinc-400 shrink-0">{rank + 1}</span>
+                              <span
+                                className="w-7 h-7 shrink-0 flex items-center justify-center rounded-full font-bold text-xs text-white"
+                                style={{ background: GAME_COLOR[g] }}
+                              >
+                                {s.number}
+                              </span>
+                              <div className="flex-1 h-1.5 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                                <div
+                                  className="h-full rounded-full"
+                                  style={{ width: `${(s.probability / maxP) * 100}%`, background: GAME_COLOR[g] }}
+                                />
+                              </div>
+                              <span className="text-[10px] tabular-nums text-zinc-500 dark:text-zinc-400 shrink-0">
+                                {(s.probability * 100).toFixed(2)}%
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                        <p className="text-[10px] text-zinc-400 dark:text-zinc-500">
+                          Entrenado con {d.trainingDraws} sorteos · {d.trainingEpochs} épocas
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {/* Números con alta probabilidad en los 3 juegos */}
+                {(() => {
+                  const allReady = GAMES.every(g => neuMap[g]?.scoredNumbers?.length)
+                  if (!allReady) return null
+                  const topSets = Object.fromEntries(
+                    GAMES.map(g => [g, new Set(neuMap[g]!.scoredNumbers.slice(0, 12).map(s => s.number))])
+                  )
+                  const inAll3 = Array.from({ length: 56 }, (_, i) => i + 1)
+                    .filter(n => GAMES.every(g => topSets[g].has(n)))
+                    .sort((a, b) => {
+                      const avgA = GAMES.reduce((s, g) => s + (neuMap[g]!.scoredNumbers.find(x => x.number === a)?.probability ?? 0), 0)
+                      const avgB = GAMES.reduce((s, g) => s + (neuMap[g]!.scoredNumbers.find(x => x.number === b)?.probability ?? 0), 0)
+                      return avgB - avgA
+                    })
+                  if (!inAll3.length) return null
+                  return (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Números en top-12 de los 3 juegos</CardTitle>
+                        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                          Mayor señal neural: la red los ubica entre los más probables en Melate, Revancha y Revanchita simultáneamente.
+                        </p>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex flex-wrap gap-3">
+                          {inAll3.map(n => {
+                            const avgProb = GAMES.reduce((s, g) => s + (neuMap[g]!.scoredNumbers.find(x => x.number === n)?.probability ?? 0), 0) / 3
+                            return (
+                              <div key={n} className="flex flex-col items-center gap-1">
+                                <span className="inline-flex h-11 w-11 items-center justify-center rounded-full font-bold text-base text-white bg-violet-600">
+                                  {n}
+                                </span>
+                                <span className="text-[10px] text-zinc-500 dark:text-zinc-400 tabular-nums">
+                                  {(avgProb * 100).toFixed(2)}%
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })()}
+
+              </div>
+            )
+          })()}
         </TabsContent>
 
       </Tabs>

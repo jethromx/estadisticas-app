@@ -1,6 +1,10 @@
 import { useState, useRef, useCallback } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
+  LineChart, Line, XAxis, YAxis,
+  Tooltip as RechartsTip, ResponsiveContainer,
+} from 'recharts'
+import {
   useSavedPredictions, useDeletePrediction,
   useAnalyzePrediction, useDrawResults, useSavePrediction,
 } from '@/api/queries'
@@ -11,6 +15,94 @@ import { cn } from '@/lib/utils'
 import type {
   LotteryTypeId, DrawResult, PredictionAccuracyResult, GeneratedCombo,
 } from '@/types/lottery'
+
+// ── colores para líneas por combo ────────────────────────────────────────────
+const COMBO_COLORS = ['#7c3aed', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444']
+
+// ── historial de aciertos: dots coloreados por sorteo ────────────────────────
+function MatchHistoryDots({ combo, draws }: { combo: GeneratedCombo; draws: DrawResult[] }) {
+  const recent = draws.slice(-15).reverse()   // los 15 más recientes, orden asc
+  if (!recent.length) return null
+  return (
+    <div className="flex items-center gap-0.5 pl-8">
+      {recent.map((draw, i) => {
+        const count = combo.numbers.filter(n => draw.numbers.includes(n)).length
+        return (
+          <span
+            key={i}
+            title={`${draw.drawDate}: ${count}/6 aciertos`}
+            className={cn(
+              'inline-block h-3 w-3 rounded-sm cursor-help',
+              count >= 5 ? 'bg-emerald-500' :
+              count === 4 ? 'bg-emerald-300 dark:bg-emerald-700' :
+              count === 3 ? 'bg-amber-400' :
+              count === 2 ? 'bg-sky-400' :
+              count === 1 ? 'bg-sky-200 dark:bg-sky-900' :
+              'bg-zinc-100 dark:bg-zinc-800',
+            )}
+          />
+        )
+      })}
+      <span className="text-[9px] text-zinc-400 ml-1">← {recent.length}s</span>
+    </div>
+  )
+}
+
+// ── línea de tiempo: un LineChart con una línea por combo ─────────────────────
+function MatchTimeline({ combos, draws }: { combos: GeneratedCombo[]; draws: DrawResult[] }) {
+  const recent = draws.slice(-20).reverse()
+  if (recent.length < 3) return null
+
+  const data = recent.map((draw, i) => {
+    const point: Record<string, number | string> = {
+      i: String(i + 1),
+      date: draw.drawDate.slice(5),   // MM-DD
+    }
+    combos.forEach((combo, ci) => {
+      point[`c${ci}`] = combo.numbers.filter(n => draw.numbers.includes(n)).length
+    })
+    return point
+  })
+
+  return (
+    <div className="flex flex-col gap-1">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400">
+        Aciertos por sorteo — últimos {recent.length}
+      </p>
+      <ResponsiveContainer width="100%" height={72}>
+        <LineChart data={data} margin={{ top: 2, right: 4, left: -28, bottom: 2 }}>
+          <XAxis dataKey="date" tick={{ fontSize: 8 }} interval="preserveStartEnd" />
+          <YAxis domain={[0, 6]} ticks={[0, 3, 6]} tick={{ fontSize: 8 }} />
+          <RechartsTip
+            content={({ active, payload, label }) =>
+              active && payload?.length ? (
+                <div className="rounded bg-zinc-900 px-2 py-1 text-[10px] text-white">
+                  <div className="mb-0.5 text-zinc-400">{label}</div>
+                  {payload.map((p, i) => (
+                    <div key={i} style={{ color: String(p.color) }}>
+                      Combo {Number((p.dataKey as string).replace('c', '')) + 1}: {String(p.value)}/6
+                    </div>
+                  ))}
+                </div>
+              ) : null
+            }
+          />
+          {combos.map((_, ci) => (
+            <Line
+              key={ci}
+              type="monotone"
+              dataKey={`c${ci}`}
+              stroke={COMBO_COLORS[ci % COMBO_COLORS.length]}
+              strokeWidth={1.5}
+              dot={false}
+              isAnimationActive={false}
+            />
+          ))}
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
 
 const GAMES: LotteryTypeId[] = ['MELATE', 'REVANCHA', 'REVANCHITA']
 
@@ -623,65 +715,95 @@ export function PredictionsPage() {
 
             {/* Combos */}
             {isExpanded && (
-              <div className="px-4 py-3 flex flex-col gap-3">
-                {set.combos.map((combo, ci) => {
-                  let bestMatches = 0
-                  let bestDraw: DrawResult | null = null
-                  const everMatched = new Set<number>()
+              <div className="px-4 py-3 flex flex-col gap-4">
 
-                  allNewDraws.forEach(draw => {
-                    const matched = combo.numbers.filter(n => draw.numbers.includes(n))
-                    matched.forEach(n => everMatched.add(n))
-                    if (matched.length > bestMatches) {
-                      bestMatches = matched.length
-                      bestDraw = draw
-                    }
-                  })
+                {/* ── Ranking: combos ordenados por avg match ── */}
+                {(() => {
+                  const ranked = [...set.combos].map((combo, ci) => {
+                    const counts = allNewDraws.map(d =>
+                      combo.numbers.filter(n => d.numbers.includes(n)).length
+                    )
+                    const avg  = counts.length ? counts.reduce((a, b) => a + b, 0) / counts.length : 0
+                    const best = counts.length ? Math.max(...counts) : 0
+                    const everMatched = new Set(
+                      allNewDraws.flatMap(d => combo.numbers.filter(n => d.numbers.includes(n)))
+                    )
+                    const bestDraw = allNewDraws.reduce<DrawResult | null>((acc, d) => {
+                      const c    = combo.numbers.filter(n => d.numbers.includes(n)).length
+                      const accC = acc ? combo.numbers.filter(n => acc.numbers.includes(n)).length : -1
+                      return c > accC ? d : acc
+                    }, null)
+                    return { ci, combo, avg, best, everMatched, bestDraw }
+                  }).sort((a, b) => b.avg - a.avg || b.best - a.best)
 
-                  return (
-                    <div key={ci} className="flex items-center gap-3 flex-wrap">
-                      <span className="text-[10px] text-zinc-400 w-5 shrink-0">#{ci + 1}</span>
-                      <div className="flex gap-1.5 flex-wrap flex-1">
-                        {combo.numbers.map(n => (
-                          <span
-                            key={n}
-                            className={cn(
-                              'inline-flex h-9 w-9 items-center justify-center rounded-full font-bold text-sm shadow-sm',
-                              allNewDraws.length === 0
-                                ? (n % 2 !== 0
-                                  ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
-                                  : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300')
-                                : everMatched.has(n)
-                                ? 'bg-emerald-500 text-white'
-                                : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500',
-                            )}
-                          >
-                            {n}
-                          </span>
-                        ))}
+                  return ranked.map(({ ci, combo, avg, best, everMatched, bestDraw }, rank) => (
+                    <div key={ci} className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        {/* rank / índice */}
+                        {allNewDraws.length > 0
+                          ? <span className="text-[10px] font-bold text-violet-500 w-5 shrink-0">#{rank + 1}</span>
+                          : <span className="text-[10px] text-zinc-400 w-5 shrink-0">#{ci + 1}</span>
+                        }
+
+                        {/* número pills */}
+                        <div className="flex gap-1.5 flex-wrap flex-1">
+                          {combo.numbers.map(n => (
+                            <span
+                              key={n}
+                              className={cn(
+                                'inline-flex h-9 w-9 items-center justify-center rounded-full font-bold text-sm shadow-sm',
+                                allNewDraws.length === 0
+                                  ? (n % 2 !== 0
+                                    ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
+                                    : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300')
+                                  : everMatched.has(n)
+                                  ? 'bg-emerald-500 text-white'
+                                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500',
+                              )}
+                            >
+                              {n}
+                            </span>
+                          ))}
+                        </div>
+
+                        {/* mejor acierto + promedio */}
+                        {allNewDraws.length > 0 && (
+                          <>
+                            <Tip
+                              content={bestDraw
+                                ? `Mejor: sorteo #${bestDraw.drawNumber} (${bestDraw.drawDate}) — ${best}/6`
+                                : 'Sin coincidencias en sorteos posteriores'}
+                              side="top"
+                            >
+                              <span className={cn(
+                                'text-sm font-bold cursor-help px-2.5 py-1 rounded-full tabular-nums',
+                                best >= 4 ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' :
+                                best >= 3 ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
+                                best >= 2 ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300' :
+                                'bg-zinc-100 dark:bg-zinc-800 text-zinc-500',
+                              )}>
+                                {best}/6
+                              </span>
+                            </Tip>
+                            <span className="text-[10px] text-zinc-400 tabular-nums">ø {avg.toFixed(1)}</span>
+                          </>
+                        )}
                       </div>
+
+                      {/* match history dots — un cuadradito por sorteo */}
                       {allNewDraws.length > 0 && (
-                        <Tip
-                          content={bestDraw
-                            ? `Mejor sorteo: #${(bestDraw as DrawResult).drawNumber} (${(bestDraw as DrawResult).drawDate}) — ${bestMatches} de 6 aciertos`
-                            : 'Sin coincidencias en sorteos posteriores'}
-                          side="top"
-                        >
-                          <span className={cn(
-                            'text-sm font-bold cursor-help px-2.5 py-1 rounded-full tabular-nums',
-                            bestMatches >= 4 ? 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300' :
-                            bestMatches >= 3 ? 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300' :
-                            bestMatches >= 2 ? 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300' :
-                            'bg-zinc-100 dark:bg-zinc-800 text-zinc-500',
-                          )}>
-                            {bestMatches}/6
-                          </span>
-                        </Tip>
+                        <MatchHistoryDots combo={combo} draws={allNewDraws} />
                       )}
                     </div>
-                  )
-                })}
+                  ))
+                })()}
 
+                {/* ── Línea de tiempo ── */}
+                {allNewDraws.length > 2 && (
+                  <MatchTimeline combos={set.combos} draws={allNewDraws} />
+                )}
+
+                {/* ── Resumen del grupo ── */}
                 {allNewDraws.length > 0 && (() => {
                   const best = Math.max(...set.combos.map(combo => {
                     let max = 0
@@ -692,7 +814,7 @@ export function PredictionsPage() {
                     return max
                   }))
                   return (
-                    <div className="mt-2 pt-2 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+                    <div className="pt-1 border-t border-zinc-100 dark:border-zinc-800 flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
                       <span>Mejor acierto en este grupo:</span>
                       <span className={cn(
                         'font-bold',
@@ -720,19 +842,19 @@ export function PredictionsPage() {
               return (
                 <div className="border-t border-violet-100 dark:border-violet-900/40 bg-violet-50/50 dark:bg-violet-900/10 px-4 py-4 flex flex-col gap-4">
                   <div className="flex flex-wrap gap-4">
-                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-violet-100 dark:border-violet-900/40 px-4 py-2 min-w-[80px]">
+                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-violet-100 dark:border-violet-900/40 px-4 py-2 min-w-20">
                       <span className="text-xl font-bold text-violet-600 dark:text-violet-400">{r.drawsAnalyzed}</span>
                       <span className="text-[10px] text-zinc-400 text-center">sorteos<br/>analizados</span>
                     </div>
-                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-emerald-100 dark:border-emerald-900/40 px-4 py-2 min-w-[80px]">
+                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-emerald-100 dark:border-emerald-900/40 px-4 py-2 min-w-20">
                       <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{r.bestMatchCount}/6</span>
                       <span className="text-[10px] text-zinc-400 text-center">mejor<br/>acierto</span>
                     </div>
-                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-sky-100 dark:border-sky-900/40 px-4 py-2 min-w-[80px]">
+                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-sky-100 dark:border-sky-900/40 px-4 py-2 min-w-20">
                       <span className="text-xl font-bold text-sky-600 dark:text-sky-400">{r.averageMatchCount.toFixed(1)}</span>
                       <span className="text-[10px] text-zinc-400 text-center">promedio<br/>por combo</span>
                     </div>
-                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 px-4 py-2 min-w-[80px]">
+                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 px-4 py-2 min-w-20">
                       <span className="text-xl font-bold text-zinc-500">{r.worstMatchCount}/6</span>
                       <span className="text-[10px] text-zinc-400 text-center">peor<br/>acierto</span>
                     </div>
@@ -759,7 +881,7 @@ export function PredictionsPage() {
                                 >{n}</span>
                               ))}
                             </div>
-                            <div className="flex-1 min-w-[100px]">
+                            <div className="flex-1 min-w-25">
                               <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                                 <div
                                   className={cn('h-full rounded-full transition-all',

@@ -130,6 +130,27 @@ export interface BayesianNumber {
   lift: number
 }
 
+export interface NeuralNumberScore {
+  number:       number
+  probability:  number
+  recentFreq50: number
+  dueScore:     number
+  trend:        number
+  rank:         number
+}
+
+export interface NeuralPrediction {
+  lotteryType:        string
+  totalDrawsAnalyzed: number
+  trainingDraws:      number
+  validationDraws:    number
+  validationHitRate:  number
+  trainingEpochs:     number
+  scoredNumbers:      NeuralNumberScore[]
+  suggestedCombos:    number[][]
+  methodDescription:  string
+}
+
 export interface DrawResult {
   drawNumber: number
   drawDate:   string

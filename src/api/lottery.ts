@@ -14,6 +14,7 @@ import type {
   ChiSquareResult,
   BacktestResult,
   BayesianNumber,
+  NeuralPrediction,
   SavedPredictionSet,
   SavePredictionRequest,
   PredictionAccuracyResult,
@@ -95,6 +96,9 @@ export const api = {
 
   bayesianAnalysis: (type: LotteryTypeId, recentWindow = 50) =>
     request<BayesianNumber[]>(`/${type}/bayesian-analysis?recentWindow=${recentWindow}`),
+
+  neuralPrediction: (type: LotteryTypeId) =>
+    request<NeuralPrediction>(`/${type}/neural-prediction`),
 
   draws: (type: LotteryTypeId, limit = 5000) =>
     request<DrawResult[]>(`/${type}/draws?limit=${limit}`),

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { LogOut, Shield, ChevronDown } from 'lucide-react'
+import { useIsFetching } from '@tanstack/react-query'
 import { cn, LOTTERY_TYPES } from '@/lib/utils'
 import type { LotteryTypeMeta } from '@/types/lottery'
 import { useAuth } from '@/contexts/AuthContext'
@@ -25,6 +26,7 @@ function GameNavItem({ meta }: { meta: LotteryTypeMeta }) {
 export function Layout() {
   const { user, logout, isAdmin } = useAuth()
   const [analysisOpen, setAnalysisOpen] = useState(true)
+  const isFetching = useIsFetching()
 
   return (
     <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -104,6 +106,12 @@ export function Layout() {
 
       {/* ── Main content ── */}
       <main className="flex flex-1 flex-col overflow-auto">
+        {/* Global loading bar */}
+        <div className={cn(
+          'h-0.5 shrink-0 bg-violet-500 transition-opacity duration-300',
+          isFetching > 0 ? 'opacity-100 animate-pulse' : 'opacity-0',
+        )} />
+
         {/* Mobile header */}
         <header className="flex h-14 items-center border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
           <span className="text-base font-semibold text-zinc-900 dark:text-zinc-100">🎱 Lotería MX</span>

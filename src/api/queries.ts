@@ -19,6 +19,7 @@ export const keys = {
   chiSquare:           (type: LotteryTypeId)                              => ['chiSquare', type] as const,
   backtest:            (type: LotteryTypeId, topK: number, draws: number) => ['backtest', type, topK, draws] as const,
   bayesianAnalysis:    (type: LotteryTypeId, window: number)              => ['bayesianAnalysis', type, window] as const,
+  neuralPrediction:    (type: LotteryTypeId)                              => ['neuralPrediction', type] as const,
 }
 
 export function useStatistics(type: LotteryTypeId, from?: string, to?: string) {
@@ -133,10 +134,19 @@ export function useBayesianAnalysis(type: LotteryTypeId, recentWindow = 50) {
   })
 }
 
-export function useDrawResults(type: LotteryTypeId) {
+export function useNeuralPrediction(type: LotteryTypeId) {
   return useQuery({
-    queryKey: keys.draws(type),
-    queryFn:  () => api.draws(type),
+    queryKey: keys.neuralPrediction(type),
+    queryFn:  () => api.neuralPrediction(type),
+    enabled:  !!type,
+    staleTime: 6 * 60 * 60 * 1000,  // 6 h — mismo TTL que el caché del servidor
+  })
+}
+
+export function useDrawResults(type: LotteryTypeId, limit?: number) {
+  return useQuery({
+    queryKey: limit ? [...keys.draws(type), limit] : keys.draws(type),
+    queryFn:  () => api.draws(type, limit),
     enabled:  !!type,
     staleTime: 5 * 60 * 1000,
   })
