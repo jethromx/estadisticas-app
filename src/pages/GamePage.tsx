@@ -315,7 +315,7 @@ function WindowedFrequenciesTab({ typeId }: { typeId: LotteryTypeId }) {
                   <LineChart data={evolutionChart.rows} margin={{ top: 4, right: 16, left: -20, bottom: 0 }}>
                     <XAxis dataKey="ventana" tick={{ fontSize: 11 }} />
                     <YAxis tick={{ fontSize: 10 }} />
-                    <Tooltip labelFormatter={(l: string) => `Ventana: ${l}`} />
+                    <Tooltip labelFormatter={(l) => `Ventana: ${l}`} />
                     <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
                     {evolutionChart.top5.map((n, i) => (
                       <Line
