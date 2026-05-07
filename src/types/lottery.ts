@@ -219,3 +219,64 @@ export interface PredictionAccuracyResult {
   comboDetails:          ComboMatchDetail[]
   improvementSuggestions: string[]
 }
+
+export interface PositionStats {
+  position: number
+  mean: number
+  stdDev: number
+  min: number
+  max: number
+  p10: number
+  p25: number
+  p50: number
+  p75: number
+  p90: number
+  recommendedMin: number
+  recommendedMax: number
+}
+
+export interface PositionAnalysis {
+  lotteryType: string
+  totalDraws: number
+  positions: PositionStats[]
+}
+
+export interface ConsecutivePair {
+  lower: number
+  higher: number
+  frequency: number
+  percentage: number
+}
+
+export interface ConsecutiveAnalysis {
+  lotteryType: string
+  totalDraws: number
+  drawsWithAtLeastOne: number
+  consecutiveRate: number
+  distributionByCount: Record<number, number>
+  avgPairsPerDraw: number
+  topPairs: ConsecutivePair[]
+}
+
+export interface DayFrequency {
+  dayOfWeek: number
+  dayName: string
+  drawCount: number
+  numberFrequencies: Record<number, number>
+  hotNumbers: number[]
+}
+
+export interface MonthFrequency {
+  month: number
+  monthName: string
+  drawCount: number
+  numberFrequencies: Record<number, number>
+  hotNumbers: number[]
+}
+
+export interface CalendarFrequency {
+  lotteryType: string
+  totalDraws: number
+  byDayOfWeek: DayFrequency[]
+  byMonth: MonthFrequency[]
+}

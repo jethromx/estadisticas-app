@@ -18,6 +18,9 @@ import type {
   SavedPredictionSet,
   SavePredictionRequest,
   PredictionAccuracyResult,
+  PositionAnalysis,
+  ConsecutiveAnalysis,
+  CalendarFrequency,
 } from '@/types/lottery'
 
 const BASE        = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/lottery`
@@ -102,6 +105,15 @@ export const api = {
 
   draws: (type: LotteryTypeId, limit = 5000) =>
     request<DrawResult[]>(`/${type}/draws?limit=${limit}`),
+
+  positionAnalysis: (type: LotteryTypeId) =>
+    request<PositionAnalysis>(`/${type}/position-analysis`),
+
+  consecutiveAnalysis: (type: LotteryTypeId, topPairs = 10) =>
+    request<ConsecutiveAnalysis>(`/${type}/consecutive-analysis?topPairs=${topPairs}`),
+
+  calendarFrequency: (type: LotteryTypeId) =>
+    request<CalendarFrequency>(`/${type}/calendar-frequency`),
 }
 
 async function predRequest<T>(path: string, options?: RequestInit): Promise<T> {

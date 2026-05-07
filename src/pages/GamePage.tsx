@@ -10,14 +10,14 @@ import {
   useDueNumbers, useWindowedFrequencies,
   useBalanceAnalysis, useSumDistribution, useSync,
   usePairAnalysis, useChiSquare, useBacktest, useBayesianAnalysis,
-  useSavePrediction,
+  useSavePrediction, usePositionAnalysis, useConsecutiveAnalysis, useCalendarFrequency,
 } from '@/api/queries'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner, PageSpinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import type { LotteryTypeId, NumberFrequency, DueNumber, WindowedFrequency, BalanceAnalysis, SumDistribution, NumberPair, ChiSquareResult, BayesianNumber, GeneratedCombo } from '@/types/lottery'
+import type { LotteryTypeId, NumberFrequency, DueNumber, WindowedFrequency, BalanceAnalysis, SumDistribution, NumberPair, ChiSquareResult, BayesianNumber, GeneratedCombo, PositionAnalysis, PositionStats, ConsecutiveAnalysis, CalendarFrequency } from '@/types/lottery'
 import { SuggestedCombosCard, buildCombo } from '@/components/SuggestedCombosCard'
 import type { SuggestedCombo } from '@/components/SuggestedCombosCard'
 import { InfoTip } from '@/components/ui/info-tip'
@@ -1205,6 +1205,377 @@ function BayesianTab({ typeId }: { typeId: LotteryTypeId }) {
 
 
 
+// ── Análisis por posición ─────────────────────────────────────────────────────
+
+function PositionBar({ stats, maxNum }: { stats: PositionStats; maxNum: number }) {
+  const pct = (v: number) => (v / maxNum) * 100
+  return (
+    <div className="flex items-center gap-3">
+      <span className="w-16 text-xs font-semibold text-zinc-500 shrink-0">Pos {stats.position}</span>
+      <div className="flex-1 relative h-6 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+        <div
+          className="absolute h-full bg-violet-100 dark:bg-violet-900/30 rounded-full"
+          style={{ left: `${pct(stats.p10)}%`, width: `${pct(stats.p90 - stats.p10)}%` }}
+        />
+        <div
+          className="absolute h-full bg-violet-300 dark:bg-violet-700/60 rounded-full"
+          style={{ left: `${pct(stats.p25)}%`, width: `${pct(stats.p75 - stats.p25)}%` }}
+        />
+        <div
+          className="absolute h-full w-0.5 bg-violet-600 dark:bg-violet-400"
+          style={{ left: `${pct(stats.p50)}%` }}
+        />
+      </div>
+      <span className="text-xs text-zinc-400 shrink-0 tabular-nums w-32 text-right">
+        {stats.recommendedMin}–{stats.recommendedMax} · μ={stats.mean}
+      </span>
+    </div>
+  )
+}
+
+function PositionTab({ analysis }: { analysis: PositionAnalysis }) {
+  const maxNum = analysis.positions.at(-1)?.max ?? 56
+  return (
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Distribución por posición</CardTitle>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Números ordenados de menor a mayor en cada sorteo.
+            Azul claro = P10–P90 · Azul medio = P25–P75 · Línea = mediana.
+            El rango recomendado (P10–P90) indica dónde cae el 80% de los valores históricos.
+          </p>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          {analysis.positions.map(pos => (
+            <PositionBar key={pos.position} stats={pos} maxNum={maxNum} />
+          ))}
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ── Consecutivos ──────────────────────────────────────────────────────────────
+
+function ConsecutiveTab({ analysis }: { analysis: ConsecutiveAnalysis }) {
+  const distData = Object.entries(analysis.distributionByCount)
+    .sort((a, b) => Number(a[0]) - Number(b[0]))
+    .map(([k, v]) => ({ label: `${k} par${Number(k) !== 1 ? 'es' : ''}`, count: Number(v) }))
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2">
+      <Card>
+        <CardHeader>
+          <CardTitle>Distribución de pares consecutivos</CardTitle>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            El <b>{analysis.consecutiveRate}%</b> de sorteos tiene al menos un par consecutivo.
+            Promedio: <b>{analysis.avgPairsPerDraw}</b> pares/sorteo.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={200}>
+            <BarChart data={distData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
+              <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+              <YAxis tick={{ fontSize: 11 }} />
+              <Tooltip formatter={(v: number) => [formatNumber(v), 'Sorteos']} />
+              <Bar dataKey="count" fill="#7c3aed" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Pares consecutivos frecuentes</CardTitle>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Parejas de números que aparecen juntos y consecutivos con mayor frecuencia.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-1">
+            {analysis.topPairs.map((p, i) => (
+              <div key={i} className="flex items-center gap-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+                <span className="w-5 text-xs text-zinc-400 text-right shrink-0">{i + 1}</span>
+                <div className="flex gap-1 shrink-0">
+                  <span className="h-8 w-8 flex items-center justify-center rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 text-sm font-bold">{p.lower}</span>
+                  <span className="h-8 w-8 flex items-center justify-center rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 text-sm font-bold">{p.higher}</span>
+                </div>
+                <div className="flex-1 h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                  <div className="h-full bg-violet-500 rounded-full" style={{ width: `${Math.min(p.percentage * 3, 100)}%` }} />
+                </div>
+                <span className="text-sm font-medium text-zinc-600 dark:text-zinc-300 shrink-0 tabular-nums">{p.percentage}%</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ── Calendario ────────────────────────────────────────────────────────────────
+
+function CalendarTab({ cal }: { cal: CalendarFrequency }) {
+  return (
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Números calientes por día de la semana</CardTitle>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Los números que más veces salieron en sorteos de cada día, basado en {formatNumber(cal.totalDraws)} sorteos históricos.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-3">
+            {cal.byDayOfWeek.map(day => (
+              <div key={day.dayOfWeek} className="flex items-center gap-3 flex-wrap">
+                <span className="w-20 text-sm text-zinc-500 dark:text-zinc-400 capitalize shrink-0 font-medium">{day.dayName}</span>
+                <div className="flex flex-wrap gap-1">
+                  {day.hotNumbers.map(n => (
+                    <span key={n} className="h-7 w-7 flex items-center justify-center rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 text-xs font-bold">
+                      {n}
+                    </span>
+                  ))}
+                </div>
+                <span className="text-xs text-zinc-400 shrink-0">{formatNumber(day.drawCount)} sorteos</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Números calientes por mes</CardTitle>
+          <p className="text-sm text-zinc-500 dark:text-zinc-400">
+            Los números más frecuentes en cada mes del año.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+            {cal.byMonth.map(month => (
+              <div key={month.month} className="flex flex-col gap-1.5">
+                <span className="text-xs font-semibold text-zinc-500 dark:text-zinc-400 capitalize">{month.monthName}</span>
+                <div className="flex flex-wrap gap-1">
+                  {month.hotNumbers.map(n => (
+                    <span key={n} className="h-6 w-6 flex items-center justify-center rounded-full bg-sky-100 text-sky-800 dark:bg-sky-900/40 dark:text-sky-300 text-xs font-bold">
+                      {n}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ── Selector manual de números ────────────────────────────────────────────────
+
+function ScoreItem({ label, value, ok, detail }: { label: string; value: string; ok: boolean | null; detail?: string }) {
+  return (
+    <div className={cn(
+      'rounded-lg border p-3',
+      ok === true  ? 'border-emerald-200 bg-emerald-50 dark:border-emerald-800 dark:bg-emerald-900/20' :
+      ok === false ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20' :
+                     'border-zinc-200 bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-800'
+    )}>
+      <p className="text-xs text-zinc-500 dark:text-zinc-400">{label}</p>
+      <p className={cn('text-xl font-bold',
+        ok === true  ? 'text-emerald-700 dark:text-emerald-400' :
+        ok === false ? 'text-amber-700 dark:text-amber-400' :
+                       'text-zinc-700 dark:text-zinc-300'
+      )}>{value}</p>
+      {detail && <p className="text-[10px] text-zinc-400 mt-0.5">{detail}</p>}
+    </div>
+  )
+}
+
+function NumberPickerTab({
+  typeId, meta, dueNums, sumDist, balance, pairs, savePickerMutation, pickerSaved, setPickerSaved,
+}: {
+  typeId: LotteryTypeId
+  meta: { numbers: number; range: string; icon: string; label: string; color: string; id: LotteryTypeId }
+  dueNums?: DueNumber[]
+  sumDist?: SumDistribution
+  balance?: BalanceAnalysis
+  pairs?: NumberPair[]
+  savePickerMutation: ReturnType<typeof useSavePrediction>
+  pickerSaved: boolean
+  setPickerSaved: (v: boolean) => void
+}) {
+  const [selected, setSelected] = useState<Set<number>>(new Set())
+  const maxNumbers = meta.numbers
+  const maxNum = meta.range.includes('-') ? parseInt(meta.range.split('-')[1]) : 56
+
+  function toggle(n: number) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(n)) { next.delete(n); return next }
+      if (next.size >= maxNumbers) return prev
+      next.add(n)
+      return next
+    })
+  }
+
+  function clearAll() { setSelected(new Set()) }
+
+  const numbers = Array.from(selected).sort((a, b) => a - b)
+  const complete = numbers.length === maxNumbers
+
+  const sum = numbers.reduce((a, b) => a + b, 0)
+  const sumOk = sumDist && complete ? sum >= sumDist.optimalMin && sum <= sumDist.optimalMax : null
+
+  const dueSet = new Set((dueNums ?? []).slice(0, 10).map(d => d.number))
+  const dueCount = numbers.filter(n => dueSet.has(n)).length
+  const dueOk = complete ? dueCount >= 2 : null
+
+  const odds  = numbers.filter(n => n % 2 !== 0).length
+  const evens = numbers.length - odds
+  const optOdds = balance?.optimalOddCount ?? Math.round(maxNumbers / 2)
+  const balanceOk = complete ? Math.abs(odds - optOdds) <= 1 : null
+
+  const topPairKeys = new Set((pairs ?? []).slice(0, 20).map(p => `${Math.min(p.number1, p.number2)}-${Math.max(p.number1, p.number2)}`))
+  const pairCount = complete ? numbers.reduce((acc, n1, i) => {
+    for (let j = i + 1; j < numbers.length; j++) {
+      const key = `${Math.min(n1, numbers[j])}-${Math.max(n1, numbers[j])}`
+      if (topPairKeys.has(key)) acc++
+    }
+    return acc
+  }, 0) : 0
+  const pairOk = complete ? pairCount >= 1 : null
+
+  function handleSave() {
+    const combo = buildCombo(numbers)
+    savePickerMutation.mutate(
+      { label: `Mis números (${typeId})`, latestDrawDate: null, lotteryType: typeId, combos: [combo] },
+      { onSuccess: () => { setPickerSaved(true); setTimeout(() => setPickerSaved(false), 2000) } },
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Elige tus números</CardTitle>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Selecciona {maxNumbers} números — el sistema calificará tu combinación en tiempo real.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={cn('text-sm font-bold tabular-nums', complete ? 'text-emerald-600 dark:text-emerald-400' : 'text-zinc-500')}>
+                {selected.size}/{maxNumbers}
+              </span>
+              {selected.size > 0 && (
+                <Button variant="outline" size="sm" onClick={clearAll}>Limpiar</Button>
+              )}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-8 gap-1.5 sm:grid-cols-10 md:grid-cols-14">
+            {Array.from({ length: maxNum }, (_, i) => i + 1).map(n => {
+              const sel = selected.has(n)
+              const due = dueSet.has(n)
+              const disabled = !sel && selected.size >= maxNumbers
+              return (
+                <button
+                  key={n}
+                  onClick={() => !disabled && toggle(n)}
+                  className={cn(
+                    'aspect-square rounded-full text-xs font-semibold transition-all select-none',
+                    sel
+                      ? 'bg-violet-600 text-white ring-2 ring-violet-400 scale-110 shadow-md'
+                      : due
+                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200 hover:bg-amber-200'
+                        : 'bg-zinc-100 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700',
+                    disabled && 'opacity-30 cursor-not-allowed',
+                  )}
+                >
+                  {n}
+                </button>
+              )
+            })}
+          </div>
+          <div className="mt-3 flex items-center gap-4 text-[11px] text-zinc-400">
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-amber-200 inline-block"/>
+              Pendientes de salir
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-3 w-3 rounded-full bg-violet-600 inline-block"/>
+              Seleccionados
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
+      {complete && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Tu combinación</CardTitle>
+          </CardHeader>
+          <CardContent className="flex flex-col gap-4">
+            <div className="flex flex-wrap gap-2">
+              {numbers.map(n => (
+                <button
+                  key={n}
+                  onClick={() => toggle(n)}
+                  title="Clic para quitar"
+                  className="h-11 w-11 flex items-center justify-center rounded-full bg-violet-600 text-white font-bold text-base hover:bg-violet-700 transition-colors"
+                >
+                  {n}
+                </button>
+              ))}
+              <span className="self-center ml-1 text-sm font-semibold text-zinc-500 tabular-nums">Σ {sum}</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+              <ScoreItem
+                label="Suma"
+                value={String(sum)}
+                ok={sumOk}
+                detail={sumDist ? `Óptimo: ${sumDist.optimalMin}–${sumDist.optimalMax}` : undefined}
+              />
+              <ScoreItem
+                label="Pendientes"
+                value={`${dueCount}/${maxNumbers}`}
+                ok={dueOk}
+                detail="Números con mayor tiempo sin salir"
+              />
+              <ScoreItem
+                label="Par / Impar"
+                value={`${evens}p · ${odds}i`}
+                ok={balanceOk}
+                detail={`Óptimo: ${balance?.optimalOddCount ?? optOdds} impares`}
+              />
+              <ScoreItem
+                label="Pares top"
+                value={String(pairCount)}
+                ok={pairOk}
+                detail="Pares de alta frecuencia histórica"
+              />
+            </div>
+
+            <Button
+              onClick={handleSave}
+              disabled={savePickerMutation.isPending || pickerSaved}
+              className="w-full sm:w-auto"
+            >
+              {pickerSaved ? '✓ Guardado en predicciones' : savePickerMutation.isPending ? 'Guardando…' : 'Guardar combinación'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  )
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function GamePage() {
@@ -1227,10 +1598,16 @@ export function GamePage() {
   const { data: balance,     isLoading: loadingBal }  = useBalanceAnalysis(typeId)
   const { data: sumDist,     isLoading: loadingSum }  = useSumDistribution(typeId)
   const { data: chiSq,       isLoading: loadingChi }  = useChiSquare(typeId)
+  const { data: positionData, isLoading: loadingPos }  = usePositionAnalysis(typeId)
+  const { data: consecutiveData, isLoading: loadingCon } = useConsecutiveAnalysis(typeId)
+  const { data: calendarData, isLoading: loadingCal }  = useCalendarFrequency(typeId)
+  const { data: pairs } = usePairAnalysis(typeId, 20)
   const saveDueMutation = useSavePrediction()
   const [dueSaved, setDueSaved] = useState(false)
   const saveGenMutation = useSavePrediction()
   const [genSavedKey, setGenSavedKey] = useState<string | null>(null)
+  const savePickerMutation = useSavePrediction()
+  const [pickerSaved, setPickerSaved] = useState(false)
 
   function handleSave(key: string, combo: GeneratedCombo, label: string, prefix: string) {
     saveGenMutation.mutate(
@@ -1276,6 +1653,11 @@ export function GamePage() {
           <TabsTrigger value="bayesian">Bayesiano</TabsTrigger>
           <TabsTrigger value="backtest">Backtest</TabsTrigger>
           <TabsTrigger value="chisq">Chi²</TabsTrigger>
+          <span className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 self-center" />
+          <TabsTrigger value="position">Posición</TabsTrigger>
+          <TabsTrigger value="calendar">Calendario</TabsTrigger>
+          <TabsTrigger value="consecutive">Consecutivos</TabsTrigger>
+          <TabsTrigger value="picker">Mis números</TabsTrigger>
         </TabsList>
 
         {/* ── Por salir ── */}
@@ -1590,6 +1972,41 @@ export function GamePage() {
             : <p className="text-sm text-zinc-500">Sin datos. Sincroniza primero.</p>}
         </TabsContent>
 
+        {/* ── Análisis por posición ── */}
+        <TabsContent value="position">
+          {loadingPos ? <PageSpinner /> : positionData
+            ? <PositionTab analysis={positionData} />
+            : <p className="text-sm text-zinc-500">Sin datos. Sincroniza primero.</p>}
+        </TabsContent>
+
+        {/* ── Calendario ── */}
+        <TabsContent value="calendar">
+          {loadingCal ? <PageSpinner /> : calendarData
+            ? <CalendarTab cal={calendarData} />
+            : <p className="text-sm text-zinc-500">Sin datos. Sincroniza primero.</p>}
+        </TabsContent>
+
+        {/* ── Consecutivos ── */}
+        <TabsContent value="consecutive">
+          {loadingCon ? <PageSpinner /> : consecutiveData
+            ? <ConsecutiveTab analysis={consecutiveData} />
+            : <p className="text-sm text-zinc-500">Sin datos. Sincroniza primero.</p>}
+        </TabsContent>
+
+        {/* ── Mis números ── */}
+        <TabsContent value="picker">
+          <NumberPickerTab
+            typeId={typeId}
+            meta={meta}
+            dueNums={dueNums}
+            sumDist={sumDist}
+            balance={balance}
+            pairs={pairs}
+            savePickerMutation={savePickerMutation}
+            pickerSaved={pickerSaved}
+            setPickerSaved={setPickerSaved}
+          />
+        </TabsContent>
 
       </Tabs>
     </div>

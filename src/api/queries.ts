@@ -20,6 +20,9 @@ export const keys = {
   backtest:            (type: LotteryTypeId, topK: number, draws: number) => ['backtest', type, topK, draws] as const,
   bayesianAnalysis:    (type: LotteryTypeId, window: number)              => ['bayesianAnalysis', type, window] as const,
   neuralPrediction:    (type: LotteryTypeId)                              => ['neuralPrediction', type] as const,
+  positionAnalysis:    (type: LotteryTypeId) => ['positionAnalysis', type] as const,
+  consecutiveAnalysis: (type: LotteryTypeId) => ['consecutiveAnalysis', type] as const,
+  calendarFrequency:   (type: LotteryTypeId) => ['calendarFrequency', type] as const,
 }
 
 export function useStatistics(type: LotteryTypeId, from?: string, to?: string) {
@@ -131,6 +134,33 @@ export function useBayesianAnalysis(type: LotteryTypeId, recentWindow = 50) {
     queryKey: keys.bayesianAnalysis(type, recentWindow),
     queryFn:  () => api.bayesianAnalysis(type, recentWindow),
     enabled:  !!type,
+  })
+}
+
+export function usePositionAnalysis(type: LotteryTypeId) {
+  return useQuery({
+    queryKey: keys.positionAnalysis(type),
+    queryFn:  () => api.positionAnalysis(type),
+    enabled:  !!type,
+    staleTime: 30 * 60 * 1000,
+  })
+}
+
+export function useConsecutiveAnalysis(type: LotteryTypeId, topPairs = 10) {
+  return useQuery({
+    queryKey: keys.consecutiveAnalysis(type),
+    queryFn:  () => api.consecutiveAnalysis(type, topPairs),
+    enabled:  !!type,
+    staleTime: 30 * 60 * 1000,
+  })
+}
+
+export function useCalendarFrequency(type: LotteryTypeId) {
+  return useQuery({
+    queryKey: keys.calendarFrequency(type),
+    queryFn:  () => api.calendarFrequency(type),
+    enabled:  !!type,
+    staleTime: 30 * 60 * 1000,
   })
 }
 

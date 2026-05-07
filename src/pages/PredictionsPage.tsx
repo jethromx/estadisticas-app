@@ -13,8 +13,70 @@ import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { CombinationGenerator } from '@/components/CombinationGenerator'
 import { cn } from '@/lib/utils'
 import type {
-  LotteryTypeId, DrawResult, PredictionAccuracyResult, GeneratedCombo,
+  LotteryTypeId, DrawResult, PredictionAccuracyResult, GeneratedCombo, SavedPredictionSet,
 } from '@/types/lottery'
+
+// ── Share / export ────────────────────────────────────────────────────────────
+
+const GAME_COLORS: Record<string, string> = {
+  MELATE: '#7c3aed',
+  REVANCHA: '#0ea5e9',
+  REVANCHITA: '#10b981',
+}
+
+async function generateShareImage(set: SavedPredictionSet): Promise<Blob> {
+  const color = GAME_COLORS[set.lotteryType ?? ''] ?? '#7c3aed'
+  const canvas = document.createElement('canvas')
+  canvas.width = 680
+  canvas.height = Math.min(set.combos.length, 5) * 90 + 160
+  const ctx = canvas.getContext('2d')!
+
+  // Background
+  ctx.fillStyle = '#18181b'
+  ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+  // Header
+  ctx.fillStyle = color
+  ctx.beginPath()
+  ctx.roundRect(0, 0, canvas.width, 80, [0, 0, 12, 12])
+  ctx.fill()
+
+  ctx.fillStyle = 'white'
+  ctx.font = 'bold 22px system-ui, sans-serif'
+  ctx.fillText(set.label, 28, 36)
+  ctx.font = '14px system-ui, sans-serif'
+  ctx.fillStyle = 'rgba(255,255,255,0.75)'
+  ctx.fillText(`${set.lotteryType ?? ''}  ·  ${set.combos.length} combo${set.combos.length !== 1 ? 's' : ''}`, 28, 60)
+
+  // Combos
+  set.combos.slice(0, 5).forEach((combo, ci) => {
+    const y = 100 + ci * 90
+    combo.numbers.forEach((n, i) => {
+      const x = 28 + i * 72
+      ctx.beginPath()
+      ctx.arc(x + 26, y + 26, 26, 0, Math.PI * 2)
+      ctx.fillStyle = color
+      ctx.globalAlpha = 0.85
+      ctx.fill()
+      ctx.globalAlpha = 1
+      ctx.fillStyle = 'white'
+      ctx.font = 'bold 18px system-ui, sans-serif'
+      ctx.textAlign = 'center'
+      ctx.fillText(String(n), x + 26, y + 33)
+    })
+    ctx.textAlign = 'left'
+    ctx.fillStyle = 'rgba(255,255,255,0.3)'
+    ctx.font = '12px system-ui, sans-serif'
+    ctx.fillText(`Σ ${combo.sum}`, 28 + combo.numbers.length * 72 + 4, y + 33)
+  })
+
+  // Footer
+  ctx.fillStyle = 'rgba(255,255,255,0.2)'
+  ctx.font = '12px system-ui, sans-serif'
+  ctx.fillText('Lotería MX — análisis estadístico', 28, canvas.height - 16)
+
+  return new Promise(resolve => canvas.toBlob(blob => resolve(blob!), 'image/png'))
+}
 
 // ── colores para líneas por combo ────────────────────────────────────────────
 const COMBO_COLORS = ['#7c3aed', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444']
@@ -717,6 +779,34 @@ export function PredictionsPage() {
                 title="Analizar precisión vs sorteos posteriores"
               >
                 {analyzingId === set.id ? '…' : analysisResults[set.id] ? '↺ Re-analizar' : '⚡ Analizar'}
+              </button>
+              <button
+                onClick={async () => {
+                  const blob = await generateShareImage(set)
+                  const text = `🎰 ${set.label}\n${set.combos.slice(0, 3).map(c => c.numbers.join(' · ')).join('\n')}`
+                  if (navigator.share && navigator.canShare?.({ files: [new File([blob], 'combo.png', { type: 'image/png' })] })) {
+                    await navigator.share({
+                      title: set.label,
+                      text,
+                      files: [new File([blob], 'combo.png', { type: 'image/png' })],
+                    })
+                  } else {
+                    // fallback: download image + open WhatsApp
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a')
+                    a.href = url; a.download = `${set.label}.png`; a.click()
+                    URL.revokeObjectURL(url)
+                    const wa = `https://wa.me/?text=${encodeURIComponent(text)}`
+                    window.open(wa, '_blank')
+                  }
+                }}
+                title="Compartir combinación"
+                className="text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors p-1"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                </svg>
               </button>
               <button
                 onClick={() => deleteSet(set.id)}
