@@ -4,7 +4,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell, ReferenceLine,
   LineChart, Line, Legend,
 } from 'recharts'
-import { LOTTERY_TYPES, formatNumber, formatDate, formatPct, getLotteryMeta } from '@/lib/utils'
+import { LOTTERY_TYPES, formatNumber, formatDate, formatPct, getLotteryMeta, cn } from '@/lib/utils'
 import {
   useStatistics, useFrequencies, useHotNumbers, useColdNumbers,
   useDueNumbers, useWindowedFrequencies,
@@ -1278,7 +1278,7 @@ function ConsecutiveTab({ analysis }: { analysis: ConsecutiveAnalysis }) {
             <BarChart data={distData} margin={{ top: 4, right: 8, left: -16, bottom: 0 }}>
               <XAxis dataKey="label" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => [formatNumber(v), 'Sorteos']} />
+              <Tooltip formatter={(v) => [formatNumber(Number(v)), 'Sorteos']} />
               <Bar dataKey="count" fill="#7c3aed" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
