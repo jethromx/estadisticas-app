@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useRef, useCallback } from 'react'
+import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   useSavedPredictions, useDeletePrediction,
   useAnalyzePrediction, useDrawResults,
@@ -12,6 +13,239 @@ import type {
 } from '@/types/lottery'
 
 const GAMES: LotteryTypeId[] = ['MELATE', 'REVANCHA', 'REVANCHITA']
+
+const GAME_LABELS: Record<string, string> = {
+  MELATE: 'Melate', REVANCHA: 'Revancha', REVANCHITA: 'Revanchita',
+}
+
+interface LookupResult {
+  numbers: number[]
+  sum: number
+  odds: number
+  matches: { game: string; draw: DrawResult }[]
+}
+
+function ComboLookup({ drawsMap }: { drawsMap: Record<string, DrawResult[]> }) {
+  const [cells, setCells] = useState<string[]>(['', '', '', '', '', ''])
+  const [result, setResult] = useState<LookupResult | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const inputRefs = useRef<(HTMLInputElement | null)[]>([])
+
+  // Per-cell error flags derived from current state
+  const filledNums = cells.map(Number).filter((n, i) => cells[i] !== '')
+  const duplicates = new Set(
+    filledNums.filter((n, i) => filledNums.indexOf(n) !== i)
+  )
+  const cellErrors = cells.map((val, i) => {
+    if (val === '') return false
+    const n = Number(val)
+    if (n < 1 || n > 56) return true
+    if (duplicates.has(n)) return true
+    return false
+  })
+  const hasInlineErrors = cellErrors.some(Boolean)
+
+  function handleCellChange(idx: number, raw: string) {
+    const val = raw.replace(/\D/g, '').slice(0, 2)
+    const next = cells.slice()
+    next[idx] = val
+    setCells(next)
+    setResult(null)
+    setError(null)
+    if (val.length === 2 && idx < 5) inputRefs.current[idx + 1]?.focus()
+  }
+
+  function handleKeyDown(idx: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Backspace' && cells[idx] === '' && idx > 0) {
+      inputRefs.current[idx - 1]?.focus()
+    }
+    if (e.key === 'Enter') search()
+  }
+
+  function handlePaste(e: React.ClipboardEvent<HTMLInputElement>) {
+    e.preventDefault()
+    const nums = e.clipboardData.getData('text').split(/[\s,]+/).map(Number).filter(n => n >= 1 && n <= 56)
+    if (nums.length >= 6) {
+      setCells(nums.slice(0, 6).map(String))
+      inputRefs.current[5]?.focus()
+    }
+  }
+
+  function search() {
+    const nums = cells.map(Number)
+    if (nums.some(n => n < 1 || n > 56)) { setError('Hay números fuera del rango 1–56'); return }
+    if (new Set(nums).size !== 6)         { setError('Hay números repetidos'); return }
+
+    const sorted = [...nums].sort((a, b) => a - b)
+    const key    = sorted.join('-')
+    const matches: { game: string; draw: DrawResult }[] = []
+
+    Object.entries(drawsMap).forEach(([game, draws]) => {
+      draws?.forEach(draw => {
+        if ([...draw.numbers].sort((a, b) => a - b).join('-') === key)
+          matches.push({ game, draw })
+      })
+    })
+
+    setResult({
+      numbers: sorted,
+      sum:  sorted.reduce((a, b) => a + b, 0),
+      odds: sorted.filter(n => n % 2 !== 0).length,
+      matches,
+    })
+    setError(null)
+  }
+
+  function reset() {
+    setCells(['', '', '', '', '', ''])
+    setResult(null)
+    setError(null)
+    inputRefs.current[0]?.focus()
+  }
+
+  const outOfRange = cells.some(v => v !== '' && (Number(v) < 1 || Number(v) > 56))
+  const hasDuplicates = duplicates.size > 0
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          🔎 Consultar combinación
+        </CardTitle>
+        <p className="text-xs text-zinc-500 dark:text-zinc-400">
+          Ingresa 6 números (1–56) para ver si esa combinación exacta ya salió en sorteos anteriores.
+        </p>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        {/* Input cells */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {cells.map((val, i) => (
+              <input
+                key={i}
+                ref={el => { inputRefs.current[i] = el }}
+                type="text"
+                inputMode="numeric"
+                value={val}
+                onChange={e => handleCellChange(i, e.target.value)}
+                onKeyDown={e => handleKeyDown(i, e)}
+                onPaste={i === 0 ? handlePaste : undefined}
+                placeholder={(i + 1).toString()}
+                className={cn(
+                  'h-11 w-11 rounded-full border text-center font-bold text-sm outline-none transition-colors',
+                  'bg-white dark:bg-zinc-900',
+                  cellErrors[i]
+                    ? 'border-red-400 dark:border-red-500 text-red-600 dark:text-red-400 ring-2 ring-red-200 dark:ring-red-900/40'
+                    : 'border-zinc-200 dark:border-zinc-700 focus:border-violet-400 dark:focus:border-violet-500 focus:ring-2 focus:ring-violet-200 dark:focus:ring-violet-900/40',
+                  val && !cellErrors[i] ? 'text-zinc-800 dark:text-zinc-100' : '',
+                  !val ? 'text-zinc-300 dark:text-zinc-600' : '',
+                )}
+                maxLength={2}
+              />
+            ))}
+          </div>
+
+          {/* Inline hints */}
+          {(outOfRange || hasDuplicates) && (
+            <div className="flex flex-col gap-0.5">
+              {outOfRange && (
+                <p className="text-xs text-red-500 dark:text-red-400">Los números deben estar entre 1 y 56.</p>
+              )}
+              {hasDuplicates && (
+                <p className="text-xs text-red-500 dark:text-red-400">No puede haber números repetidos.</p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={search}
+            disabled={cells.some(c => c === '') || hasInlineErrors}
+            className="rounded-lg bg-violet-600 hover:bg-violet-700 disabled:opacity-40 disabled:cursor-not-allowed text-white text-sm font-semibold px-4 py-2 transition-colors"
+          >
+            Buscar
+          </button>
+          {result && (
+            <button
+              onClick={reset}
+              className="text-xs text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 underline underline-offset-2"
+            >
+              Limpiar
+            </button>
+          )}
+        </div>
+
+        {error && (
+          <p className="text-xs text-red-500 dark:text-red-400">{error}</p>
+        )}
+
+        {result && (
+          <div className="flex flex-col gap-3 pt-1">
+            {/* Numbers display */}
+            <div className="flex gap-2 flex-wrap">
+              {result.numbers.map(n => (
+                <span
+                  key={n}
+                  className={cn(
+                    'inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-sm text-white',
+                    result.matches.length > 0
+                      ? 'bg-orange-500'
+                      : n % 2 !== 0
+                      ? 'bg-violet-500'
+                      : 'bg-sky-500',
+                  )}
+                >
+                  {n}
+                </span>
+              ))}
+              <div className="flex flex-col justify-center ml-2 gap-0.5">
+                <span className="text-xs text-zinc-500">Σ <b className="text-zinc-700 dark:text-zinc-200">{result.sum}</b></span>
+                <span className="text-xs text-zinc-500">{result.odds}I · {6 - result.odds}P</span>
+              </div>
+            </div>
+
+            {/* Match result */}
+            {result.matches.length === 0 ? (
+              <div className="flex items-center gap-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800 px-4 py-3">
+                <span className="text-emerald-600 dark:text-emerald-400 text-base">✓</span>
+                <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                  Esta combinación <b>nunca ha sido sorteada</b> en el histórico disponible.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-2 rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 px-4 py-3">
+                  <span className="text-orange-500 text-base">⚠</span>
+                  <p className="text-sm font-medium text-orange-700 dark:text-orange-300">
+                    Esta combinación <b>ya fue sorteada {result.matches.length} {result.matches.length === 1 ? 'vez' : 'veces'}</b>.
+                  </p>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  {result.matches.map(({ game, draw }, i) => (
+                    <div key={i} className="flex items-center gap-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/50 px-3 py-2 text-xs">
+                      <span className="font-semibold text-zinc-700 dark:text-zinc-300 w-24 shrink-0">
+                        {GAME_LABELS[game] ?? game}
+                      </span>
+                      <span className="text-zinc-500 dark:text-zinc-400">
+                        Sorteo #{draw.drawNumber}
+                      </span>
+                      <span className="text-zinc-400 dark:text-zinc-500">
+                        {new Date(draw.drawDate).toLocaleDateString('es-MX', {
+                          day: '2-digit', month: 'short', year: 'numeric',
+                        })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
 
 export function PredictionsPage() {
   const { data: savedSets = [], isLoading: savedSetsLoading } = useSavedPredictions()
@@ -29,6 +263,7 @@ export function PredictionsPage() {
   const deleteMutation  = useDeletePrediction()
   const analyzeMutation = useAnalyzePrediction()
 
+  const listRef = useRef<HTMLDivElement>(null)
   const [expandedSetId,  setExpandedSetId]  = useState<string | null>(null)
   const [analysisResults, setAnalysisResults] = useState<Record<string, PredictionAccuracyResult>>({})
   const [analysisErrors,  setAnalysisErrors]  = useState<Record<string, string>>({})
@@ -52,6 +287,15 @@ export function PredictionsPage() {
     )
   }
 
+  const virtualizer = useVirtualizer({
+    count: savedSets.length,
+    getScrollElement: () => listRef.current,
+    estimateSize: useCallback((i: number) =>
+      expandedSetId === savedSets[i]?.id ? 420 : 72
+    , [expandedSetId, savedSets]),
+    overscan: 3,
+  })
+
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
 
@@ -66,6 +310,9 @@ export function PredictionsPage() {
 
       {/* Generator */}
       <CombinationGenerator />
+
+      {/* Manual combo lookup */}
+      <ComboLookup drawsMap={drawsMap} />
 
       {/* Saved predictions header */}
       <div className="flex items-center gap-3 pt-2">
@@ -92,15 +339,36 @@ export function PredictionsPage() {
         </div>
       )}
 
-      {/* Prediction cards */}
-      {!savedSetsLoading && savedSets.map((set: SavedPredictionSet) => {
-        const allNewDraws = GAMES.flatMap(g =>
-          (drawsMap[g] ?? []).filter(d => !set.latestDrawDate || d.drawDate > set.latestDrawDate),
-        )
-        const isExpanded = expandedSetId === set.id
+      {/* Prediction cards — virtualised */}
+      {!savedSetsLoading && savedSets.length > 0 && (
+        <div
+          ref={listRef}
+          className="overflow-y-auto rounded-xl"
+          style={{ maxHeight: '72vh' }}
+        >
+          <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
+            {virtualizer.getVirtualItems().map(virtualRow => {
+              const set = savedSets[virtualRow.index]
+              const allNewDraws = GAMES.flatMap(g =>
+                (drawsMap[g] ?? []).filter(d => !set.latestDrawDate || d.drawDate > set.latestDrawDate),
+              )
+              const isExpanded = expandedSetId === set.id
 
-        return (
-          <div key={set.id} className="rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-900">
+              return (
+                <div
+                  key={virtualRow.key}
+                  data-index={virtualRow.index}
+                  ref={virtualizer.measureElement}
+                  style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    transform: `translateY(${virtualRow.start}px)`,
+                    paddingBottom: '12px',
+                  }}
+                >
+          <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-900">
             {/* Set header */}
             <div className="flex items-center justify-between px-4 py-3 bg-zinc-50 dark:bg-zinc-800/50">
               <button
@@ -319,8 +587,12 @@ export function PredictionsPage() {
               )
             })()}
           </div>
-        )
-      })}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

@@ -1220,6 +1220,7 @@ function ComparativeSuggestions({
   backtestMap,
   pairsMap,
   arimaNumbers,
+  drawsMap = {},
 }: {
   rankedScores:  NumberScore[]
   bayesMap:      Record<string, BayesianNumber[] | undefined>
@@ -1229,7 +1230,18 @@ function ComparativeSuggestions({
   backtestMap:   Record<string, BacktestResult | undefined>
   pairsMap:      Record<string, NumberPair[] | undefined>
   arimaNumbers?: number[]
+  drawsMap?:     Record<string, DrawResult[]>
 }) {
+  const drawnCombos = useMemo(() => {
+    const s = new Set<string>()
+    Object.values(drawsMap).forEach(draws =>
+      draws?.forEach(d => s.add([...d.numbers].sort((a, b) => a - b).join('-')))
+    )
+    return s
+  }, [drawsMap]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isDrawn = (numbers: number[]) =>
+    drawnCombos.has([...numbers].sort((a, b) => a - b).join('-'))
   const bayesLookup = useMemo(() => {
     const lk: Record<string, Record<number, BayesianNumber>> = {}
     GAMES.forEach(g => {
@@ -1919,9 +1931,18 @@ function ComparativeSuggestions({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div>
-                      <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-                        {combo.title}
-                      </p>
+                      <div className="flex items-center gap-2">
+                        <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                          {combo.title}
+                        </p>
+                        {isDrawn(combo.numbers) && (
+                          <Tip content="Esta combinación exacta ya apareció como ganadora en el histórico de sorteos.">
+                            <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 cursor-help whitespace-nowrap">
+                              ya sorteada
+                            </span>
+                          </Tip>
+                        )}
+                      </div>
                       <p className="text-xs text-zinc-500 dark:text-zinc-400">{combo.desc}</p>
                     </div>
                     <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
@@ -2036,9 +2057,18 @@ function ComparativeSuggestions({
                   >
                     <div className="flex items-start justify-between gap-2">
                       <div>
-                        <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
-                          {combo.title}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">
+                            {combo.title}
+                          </p>
+                          {isDrawn(combo.numbers) && (
+                            <Tip content="Esta combinación exacta ya apareció como ganadora en el histórico de sorteos.">
+                              <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 cursor-help whitespace-nowrap">
+                                ya sorteada
+                              </span>
+                            </Tip>
+                          )}
+                        </div>
                         <p className="text-xs text-zinc-500 dark:text-zinc-400">{combo.desc}</p>
                       </div>
                       <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
@@ -2243,7 +2273,16 @@ function ComparativeSuggestions({
                     <div key={prop.title} className="rounded-xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-3">
                       <div className="flex items-start justify-between gap-2">
                         <div>
-                          <p className="text-sm font-bold text-zinc-800 dark:text-zinc-100">{prop.title}</p>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-bold text-zinc-800 dark:text-zinc-100">{prop.title}</p>
+                            {isDrawn(prop.numbers) && (
+                              <Tip content="Esta combinación exacta ya apareció como ganadora en el histórico de sorteos.">
+                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400 cursor-help whitespace-nowrap">
+                                  ya sorteada
+                                </span>
+                              </Tip>
+                            )}
+                          </div>
                           <p className="text-xs text-zinc-500 dark:text-zinc-400">{prop.desc}</p>
                         </div>
                         <div className="text-right shrink-0 flex flex-col items-end gap-0.5">
@@ -2318,6 +2357,116 @@ function ComparativeSuggestions({
         )
       })()}
 
+    </div>
+  )
+}
+
+// ── SumRecurrenceTable ────────────────────────────────────────────────────────
+
+function SumRecurrenceTable({ drawsMap }: { drawsMap: Record<string, DrawResult[]> }) {
+  const rows = useMemo(() => {
+    type GameStat = { appearances: number; avgGap: number; drawsSinceLast: number }
+    const perGame: Record<string, Record<number, GameStat>> = {}
+
+    Object.entries(drawsMap).forEach(([game, draws]) => {
+      if (!draws?.length) return
+      const sorted = [...draws].sort((a, b) => a.drawNumber - b.drawNumber)
+      const total  = sorted.length
+      const bySum: Record<number, number[]> = {}
+
+      sorted.forEach((d, idx) => {
+        const s = d.numbers.reduce((a, b) => a + b, 0)
+        if (!bySum[s]) bySum[s] = []
+        bySum[s].push(idx)
+      })
+
+      perGame[game] = {}
+      Object.entries(bySum).forEach(([sumStr, indices]) => {
+        const sum  = Number(sumStr)
+        const gaps = indices.slice(1).map((idx, i) => idx - indices[i])
+        const avgGap = gaps.length ? gaps.reduce((a, b) => a + b, 0) / gaps.length : total
+        perGame[game][sum] = {
+          appearances:   indices.length,
+          avgGap,
+          drawsSinceLast: total - 1 - indices[indices.length - 1],
+        }
+      })
+    })
+
+    const games      = Object.keys(perGame)
+    if (!games.length) return []
+
+    const allSums = new Set<number>()
+    games.forEach(g => Object.keys(perGame[g]).forEach(s => allSums.add(Number(s))))
+
+    return Array.from(allSums).map(sum => {
+      const stats = games.map(g => perGame[g][sum]).filter(Boolean)
+      if (!stats.length) return null
+
+      const avgGap       = stats.reduce((a, s) => a + s.avgGap, 0)       / stats.length
+      const appearances  = stats.reduce((a, s) => a + s.appearances, 0)   / stats.length
+      const sinceLast    = stats.reduce((a, s) => a + s.drawsSinceLast, 0) / stats.length
+      const ratio        = avgGap > 0 ? sinceLast / avgGap : 0
+
+      return { sum, appearances: Math.round(appearances), avgGap, sinceLast, ratio }
+    }).filter(Boolean).sort((a, b) => (b!.ratio) - (a!.ratio)) as {
+      sum: number; appearances: number; avgGap: number; sinceLast: number; ratio: number
+    }[]
+  }, [drawsMap])
+
+  if (!rows.length) return null
+
+  const shown = rows.slice(0, 20)
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead>
+          <tr className="border-b border-zinc-200 dark:border-zinc-700">
+            <th className="py-2 pr-3 text-left font-semibold text-zinc-500 dark:text-zinc-400">Suma</th>
+            <th className="py-2 pr-3 text-right font-semibold text-zinc-500 dark:text-zinc-400">Apariciones</th>
+            <th className="py-2 pr-3 text-right font-semibold text-zinc-500 dark:text-zinc-400">Gap prom.</th>
+            <th className="py-2 pr-3 text-right font-semibold text-zinc-500 dark:text-zinc-400">Hace (sort.)</th>
+            <th className="py-2 text-left font-semibold text-zinc-500 dark:text-zinc-400">Estado</th>
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map(row => {
+            const overdue = row.ratio > 1.5
+            const due     = row.ratio > 1.0 && !overdue
+            return (
+              <tr key={row.sum} className="border-b border-zinc-100 dark:border-zinc-800/60 last:border-0">
+                <td className="py-1.5 pr-3 font-bold text-zinc-800 dark:text-zinc-100 tabular-nums">{row.sum}</td>
+                <td className="py-1.5 pr-3 text-right text-zinc-500 tabular-nums">{row.appearances}</td>
+                <td className="py-1.5 pr-3 text-right text-zinc-500 tabular-nums">{row.avgGap.toFixed(1)}</td>
+                <td className={cn('py-1.5 pr-3 text-right font-semibold tabular-nums',
+                  overdue ? 'text-orange-600 dark:text-orange-400'
+                  : due   ? 'text-amber-600 dark:text-amber-400'
+                  :         'text-zinc-500 dark:text-zinc-400',
+                )}>
+                  {Math.round(row.sinceLast)}
+                </td>
+                <td className="py-1.5">
+                  {overdue ? (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/40 text-orange-600 dark:text-orange-400">
+                      pendiente
+                    </span>
+                  ) : due ? (
+                    <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400">
+                      por salir
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-zinc-400 dark:text-zinc-500">al día</span>
+                  )}
+                </td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+      <p className="mt-3 text-[10px] text-zinc-400 dark:text-zinc-500">
+        Promedio entre los 3 juegos · Top 20 más pendientes · Gap prom. = sorteos entre apariciones consecutivas
+      </p>
     </div>
   )
 }
@@ -2637,6 +2786,25 @@ export function ComparativePage() {
               </CardContent>
             </Card>
 
+            <Card>
+              <CardHeader>
+                <CardTitle>Recurrencia de Sumas</CardTitle>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                  Para cada valor de suma, cuántos sorteos pasan en promedio entre apariciones consecutivas
+                  y cuántos sorteos llevan sin aparecer. Las más pendientes encabezan la tabla.
+                </p>
+              </CardHeader>
+              <CardContent>
+                {distribLoading
+                  ? <div className="h-40 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                  : <SumRecurrenceTable drawsMap={{
+                      MELATE:     drawsMelate     ?? [],
+                      REVANCHA:   drawsRevancha   ?? [],
+                      REVANCHITA: drawsRevanchita ?? [],
+                    }} />}
+              </CardContent>
+            </Card>
+
           </div>
         </TabsContent>
 
@@ -2745,6 +2913,11 @@ export function ComparativePage() {
             backtestMap={backtestMap}
             pairsMap={pairsMap}
             arimaNumbers={arimaTopNumbers}
+            drawsMap={{
+              MELATE: drawsMelate ?? [],
+              REVANCHA: drawsRevancha ?? [],
+              REVANCHITA: drawsRevanchita ?? [],
+            }}
           />
         </TabsContent>
 
