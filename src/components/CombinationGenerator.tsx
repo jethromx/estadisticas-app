@@ -259,7 +259,7 @@ export function CombinationGenerator() {
         label: `Predicción ${new Date().toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}`,
         latestDrawDate,
         combos: results,
-        lotteryType: null,
+        lotteryType: GAMES[0],
         generationParams: { weights, numCombos, balance, sigmaStrict, diversity, excludeDrawn, sumMin: opt.sMin, sumMax: opt.sMax, games: GAMES },
       },
       { onSuccess: () => { setSavedOk(true); setTimeout(() => setSavedOk(false), 4000) } },
