@@ -1,5 +1,86 @@
+import { useState } from 'react'
 import { Link, Navigate } from 'react-router-dom'
+import { ChevronDown } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
+import { cn } from '@/lib/utils'
+
+// ── FAQ ───────────────────────────────────────────────────────────────────────
+
+const FAQ_ITEMS = [
+  {
+    q: '¿Esto garantiza ganar la lotería?',
+    a: 'No. La lotería es un juego de azar y ningún sistema puede garantizar premios. Lo que ofrecemos es un enfoque estadístico que maximiza la cobertura de probabilidad con fuerza bruta (más combinaciones) y constancia (jugar cada sorteo durante un año), aumentando las oportunidades sin eliminar el factor aleatorio.',
+  },
+  {
+    q: '¿Qué significa "fuerza bruta" en este contexto?',
+    a: 'En lugar de jugar 1 combinación por sorteo, generamos múltiples combinaciones optimizadas por sorteo — cada una seleccionada con criterios estadísticos distintos (números pendientes, pares frecuentes, balance par/impar, etc.). Más combinaciones bien elegidas = más cobertura del espacio de probabilidad.',
+  },
+  {
+    q: '¿Por qué es importante la constancia de un año?',
+    a: 'Melate se juega dos o tres veces por semana, sumando más de 100 sorteos al año. Jugar de forma consistente durante ese período acumula probabilidad real. Una estrategia que se abandona al tercer sorteo no puede demostrar su efectividad estadística.',
+  },
+  {
+    q: '¿Qué es el "Due Score" y por qué importa?',
+    a: 'El Due Score mide cuánto tiempo lleva un número sin aparecer en relación a su frecuencia histórica. Un número con Due Score alto no ha salido más de lo esperado, lo que en teoría aumenta la presión estadística para que aparezca. No es certeza, pero es una señal útil.',
+  },
+  {
+    q: '¿Cómo se generan las combinaciones?',
+    a: 'El sistema combina varios algoritmos: análisis bayesiano (números que aumentaron su frecuencia recientemente), números calientes y fríos, pares que co-ocurren con frecuencia, balance par/impar, y backtest histórico. Puedes ajustar los pesos de cada criterio desde el generador.',
+  },
+  {
+    q: '¿Puedo elegir mis propios números?',
+    a: 'Sí. Además del generador automático, existe un selector manual donde puedes elegir tus números favoritos. El sistema califica la combinación en tiempo real mostrando el balance par/impar, la suma y qué tan "pendientes" están los números elegidos.',
+  },
+  {
+    q: '¿Con qué juegos de Lotería Nacional es compatible?',
+    a: 'Actualmente soporta Melate (6 de 56), Revancha (6 de 56) y Revanchita (6 de 56). Los tres comparten el mismo rango pero tienen sorteos y estadísticas independientes.',
+  },
+  {
+    q: '¿Cada cuánto se actualizan los datos históricos?',
+    a: 'El administrador del sistema puede sincronizar los datos históricos manualmente desde el Dashboard. Los datos se obtienen directamente de las fuentes oficiales de Pronósticos para la Asistencia Pública.',
+  },
+]
+
+function FaqItem({ q, a }: { q: string; a: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-b border-zinc-200 dark:border-zinc-700 last:border-0">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex w-full items-center justify-between gap-4 py-4 text-left"
+      >
+        <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-100">{q}</span>
+        <ChevronDown className={cn('h-4 w-4 shrink-0 text-zinc-400 transition-transform duration-200', open && 'rotate-180')} />
+      </button>
+      {open && (
+        <p className="pb-4 text-sm leading-relaxed text-zinc-600 dark:text-zinc-400">{a}</p>
+      )}
+    </div>
+  )
+}
+
+function FaqSection() {
+  return (
+    <section className="px-4 py-20 bg-white dark:bg-zinc-900">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-10 text-center">
+          <span className="text-xs font-bold uppercase tracking-widest text-violet-500">FAQ</span>
+          <h2 className="mt-2 text-3xl font-black text-zinc-900 dark:text-zinc-100 sm:text-4xl">
+            Preguntas frecuentes
+          </h2>
+          <p className="mt-3 text-zinc-500 dark:text-zinc-400">
+            Todo lo que necesitas saber antes de empezar.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/40 px-6">
+          {FAQ_ITEMS.map((item) => (
+            <FaqItem key={item.q} {...item} />
+          ))}
+        </div>
+      </div>
+    </section>
+  )
+}
 
 // ── pequeños componentes visuales ─────────────────────────────────────────────
 
@@ -333,6 +414,9 @@ export function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── FAQ ── */}
+      <FaqSection />
 
       {/* ── CTA FINAL ── */}
       <section className="bg-gradient-to-br from-violet-600 to-indigo-700 px-4 py-20 text-white">

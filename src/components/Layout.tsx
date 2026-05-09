@@ -152,6 +152,12 @@ export function Layout() {
             <span>Predicciones</span>
           </NavLink>
 
+          {/* Ayuda */}
+          <NavLink to="/ayuda" className={navLink}>
+            <span className="text-lg">📖</span>
+            <span>Cómo usar</span>
+          </NavLink>
+
           <div className="my-2 h-px bg-zinc-100 dark:bg-zinc-800" />
 
           {/* Análisis — sección colapsable */}
@@ -262,6 +268,19 @@ export function Layout() {
         >
           <span className="text-base">🔍</span>
           <span>Comp.</span>
+        </NavLink>
+
+        <NavLink
+          to="/ayuda"
+          className={({ isActive }) =>
+            cn(
+              'flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-xs font-medium transition-colors',
+              isActive ? 'text-violet-700 dark:text-violet-300' : 'text-zinc-500 hover:text-zinc-900 dark:text-zinc-400',
+            )
+          }
+        >
+          <span className="text-base">📖</span>
+          <span>Ayuda</span>
         </NavLink>
 
         {LOTTERY_TYPES.map(meta => (

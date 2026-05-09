@@ -13,6 +13,7 @@ import { PredictionsPage } from '@/pages/PredictionsPage'
 import { LoginPage } from '@/pages/LoginPage'
 import { AdminDashboard } from '@/pages/admin/AdminDashboard'
 import { LandingPage } from '@/pages/LandingPage'
+import { HelpPage } from '@/pages/HelpPage'
 
 const queryClient = new QueryClient()
 
@@ -32,6 +33,7 @@ export default function App() {
                 <Route path="game/:id" element={<GamePage />} />
                 <Route path="comparative" element={<ComparativePage />} />
                 <Route path="predicciones" element={<PredictionsPage />} />
+                <Route path="ayuda" element={<HelpPage />} />
                 <Route element={<AdminRoute />}>
                   <Route path="admin" element={<AdminDashboard />} />
                 </Route>
