@@ -5,6 +5,7 @@ import { useIsFetching } from '@tanstack/react-query'
 import { cn, LOTTERY_TYPES } from '@/lib/utils'
 import type { LotteryTypeMeta } from '@/types/lottery'
 import { useAuth } from '@/contexts/AuthContext'
+import { UserAvatar } from '@/components/ui/user-avatar'
 
 const navLink = ({ isActive }: { isActive: boolean }) =>
   cn(
@@ -43,7 +44,7 @@ export function Layout() {
         <div className="border-b border-zinc-200 dark:border-zinc-800 px-3 py-2">
           <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
             <div className="flex items-center gap-2 min-w-0">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm dark:bg-violet-900/40">👤</span>
+              <UserAvatar username={user?.username ?? '?'} size="sm" />
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{user?.username}</p>
                 {isAdmin && <p className="text-[10px] font-medium text-violet-600 dark:text-violet-400">Admin</p>}
@@ -123,7 +124,7 @@ export function Layout() {
           <span className="text-base font-semibold text-zinc-900 dark:text-zinc-100">🎱 Lotería MX</span>
           <div className="flex items-center gap-2">
             <div className="flex items-center gap-1.5">
-              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-xs dark:bg-violet-900/40">👤</span>
+              <UserAvatar username={user?.username ?? '?'} size="sm" />
               <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{user?.username}</span>
             </div>
             <button
