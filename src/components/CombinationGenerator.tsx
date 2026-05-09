@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { toast } from 'sonner'
 import {
   useDueNumbers, useWindowedFrequencies, useSumDistribution,
   useDrawResults, usePairAnalysis, useBacktest,
@@ -262,7 +263,7 @@ export function CombinationGenerator() {
         lotteryType: GAMES[0],
         generationParams: { weights, numCombos, balance, sigmaStrict, diversity, excludeDrawn, sumMin: opt.sMin, sumMax: opt.sMax, games: GAMES },
       },
-      { onSuccess: () => { setSavedOk(true); setTimeout(() => setSavedOk(false), 4000) } },
+      { onSuccess: () => toast.success('Predicción guardada — ver en Predicciones'), onError: () => toast.error('Error al guardar') },
     )
   }
 
@@ -533,12 +534,6 @@ export function CombinationGenerator() {
                   className="flex-1 flex items-center justify-center gap-2 py-2 rounded-lg border border-dashed border-violet-300 dark:border-violet-700 text-violet-600 dark:text-violet-400 text-xs font-medium hover:bg-violet-50 dark:hover:bg-violet-900/20 disabled:opacity-50 transition-colors">
                   {saveMutation.isPending ? '…' : '💾 Guardar predicción'}
                 </button>
-                {savedOk && (
-                  <a href="/predicciones"
-                    className="text-xs text-emerald-600 dark:text-emerald-400 font-medium whitespace-nowrap hover:underline">
-                    ✓ Guardado — Ver en Predicciones →
-                  </a>
-                )}
               </div>
 
               {results.map((combo, idx) => {

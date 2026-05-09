@@ -6,6 +6,7 @@ import {
 } from 'recharts'
 import { LOTTERY_TYPES, formatNumber, formatDate, formatPct, getLotteryMeta, cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
+import { toast } from 'sonner'
 import {
   useStatistics, useFrequencies, useHotNumbers, useColdNumbers,
   useDueNumbers, useWindowedFrequencies,
@@ -235,7 +236,7 @@ function WindowedFrequenciesTab({ typeId }: { typeId: LotteryTypeId }) {
                                   onClick={() => {
                                     saveMutation.mutate(
                                       { label: `Tendencia ${winSize}s — ${title} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
-                                      { onSuccess: () => { setSavedKey(key); setTimeout(() => setSavedKey(null), 2000) } },
+                                      { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
                                     )
                                   }}
                                 >
@@ -494,7 +495,7 @@ function BalanceTab({ balance, typeId }: { balance: BalanceAnalysis; typeId: Lot
                           onClick={() => {
                             saveMutation.mutate(
                               { label: `Balance — ${title} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
-                              { onSuccess: () => { setSavedKey(key); setTimeout(() => setSavedKey(null), 2000) } },
+                              { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
                             )
                           }}
                         >
@@ -690,7 +691,7 @@ function SumDistributionTab({ dist, typeId }: { dist: SumDistribution; typeId: L
                           onClick={() => {
                             saveMutation.mutate(
                               { label: `Suma — ${title} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
-                              { onSuccess: () => { setSavedKey(key); setTimeout(() => setSavedKey(null), 2000) } },
+                              { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
                             )
                           }}
                         >
@@ -840,7 +841,7 @@ function PairAnalysisTab({ typeId }: { typeId: LotteryTypeId }) {
                 onSave={(key, combo, lbl) => {
                   saveMutation.mutate(
                     { label: `Pares — ${lbl} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
-                    { onSuccess: () => { setSavedKey(key); setTimeout(() => setSavedKey(null), 2000) } },
+                    { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
                   )
                 }}
               />
@@ -981,7 +982,7 @@ function BacktestTab({ typeId, defaultK }: { typeId: LotteryTypeId; defaultK: nu
                 onSave={(key, combo, lbl) => {
                   saveMutation.mutate(
                     { label: `Backtest — ${lbl} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
-                    { onSuccess: () => { setSavedKey(key); setTimeout(() => setSavedKey(null), 2000) } },
+                    { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
                   )
                 }}
               />
@@ -1099,7 +1100,7 @@ function BayesianTab({ typeId }: { typeId: LotteryTypeId }) {
                 onSave={(key, combo, lbl) => {
                   saveMutation.mutate(
                     { label: `Bayesiano — ${lbl} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
-                    { onSuccess: () => { setSavedKey(key); setTimeout(() => setSavedKey(null), 2000) } },
+                    { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
                   )
                 }}
               />
@@ -1453,7 +1454,7 @@ function NumberPickerTab({
     const combo = buildCombo(numbers)
     savePickerMutation.mutate(
       { label: `Mis números (${typeId})`, latestDrawDate: null, lotteryType: typeId, combos: [combo] },
-      { onSuccess: () => { setPickerSaved(true); setTimeout(() => setPickerSaved(false), 2000) } },
+      { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
     )
   }
 
@@ -1633,7 +1634,10 @@ export function GamePage() {
           </div>
         </div>
         {isAdmin && (
-          <Button variant="outline" size="sm" onClick={() => sync.mutate()} disabled={sync.isPending}>
+          <Button variant="outline" size="sm" onClick={() => sync.mutate(undefined, {
+            onSuccess: () => toast.success(`${meta.label} sincronizado`),
+            onError: (err) => toast.error(`Error: ${err.message}`),
+          })} disabled={sync.isPending}>
             {sync.isPending ? <Spinner className="h-4 w-4" /> : null}
             Sincronizar
           </Button>
@@ -1683,7 +1687,7 @@ export function GamePage() {
                 onSave={(_key, combo, label) => {
                   saveDueMutation.mutate(
                     { label: `${label} (${typeId})`, latestDrawDate: null, lotteryType: typeId, combos: [combo] },
-                    { onSuccess: () => { setDueSaved(true); setTimeout(() => setDueSaved(false), 2000) } },
+                    { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
                   )
                 }}
               />

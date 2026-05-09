@@ -5,6 +5,7 @@ import {
 } from 'recharts'
 import { LOTTERY_TYPES, formatNumber, formatDate } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
+import { toast } from 'sonner'
 import {
   useStatistics, useSync, useDrawResults, useSavedPredictions, useDueNumbers,
 } from '@/api/queries'
@@ -193,7 +194,9 @@ function GameCard({ id }: { id: LotteryTypeId }) {
                 sync.mutate(undefined, {
                   onSuccess: () => {
                     window.dispatchEvent(new Event('storage'))
+                    toast.success(`${meta.label} sincronizado`)
                   },
+                  onError: (err) => toast.error(`Error al sincronizar: ${err.message}`),
                 })
               }}
               disabled={sync.isPending}
@@ -412,7 +415,11 @@ function SyncAllButton() {
   return (
     <Button
       onClick={() => sync.mutate(undefined, {
-        onSuccess: () => window.dispatchEvent(new Event('storage')),
+        onSuccess: () => {
+          window.dispatchEvent(new Event('storage'))
+          toast.success('Todos los juegos sincronizados')
+        },
+        onError: (err) => toast.error(`Error al sincronizar: ${err.message}`),
       })}
       disabled={sync.isPending}
       variant="outline"

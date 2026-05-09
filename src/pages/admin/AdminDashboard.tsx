@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { authApi } from '@/api/auth'
+import { toast } from 'sonner'
 import { useAuth } from '@/contexts/AuthContext'
 import type { AdminUser, CreateUserRequest, UpdateUserRequest } from '@/types/auth'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -108,8 +109,11 @@ function UsersTab() {
       await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
       setShowForm(false)
       setForm({ username: '', email: '', password: '', role: 'USER' })
+      toast.success(`Usuario "${form.username}" creado`)
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Error al crear usuario')
+      const msg = err instanceof Error ? err.message : 'Error al crear usuario'
+      setFormError(msg)
+      toast.error(msg)
     } finally {
       setFormLoading(false)
     }
@@ -135,12 +139,14 @@ function UsersTab() {
     try {
       await authApi.updateUser(editingUser.id, editForm)
       await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      toast.success('Usuario actualizado')
       setEditingUser(null)
       setEditForm({ username: '', email: '', role: 'USER', active: true })
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Error al actualizar usuario'
       console.error('Update error:', message, err)
       setFormError(message)
+      toast.error(message)
     } finally {
       setFormLoading(false)
     }
@@ -154,8 +160,9 @@ function UsersTab() {
     try {
       await authApi.deleteUser(id)
       await queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
+      toast.success(`Usuario "${username}" eliminado`)
     } catch (err) {
-      alert(`Error al eliminar usuario: ${err instanceof Error ? err.message : 'Error desconocido'}`)
+      toast.error(`Error al eliminar: ${err instanceof Error ? err.message : 'Error desconocido'}`)
     }
   }
 

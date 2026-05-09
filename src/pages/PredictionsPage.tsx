@@ -12,6 +12,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { CombinationGenerator } from '@/components/CombinationGenerator'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
 import type {
   LotteryTypeId, DrawResult, PredictionAccuracyResult, GeneratedCombo, SavedPredictionSet,
 } from '@/types/lottery'
@@ -482,8 +483,8 @@ function ManualComboCreator() {
     saveMutation.mutate(
       { label: label.trim(), latestDrawDate: null, combos: builtCombos, lotteryType: gameType },
       {
-        onSuccess: () => { setSavedOk(true); reset(); setTimeout(() => { setSavedOk(false); setOpen(false) }, 1800) },
-        onError:   (err) => setError(err instanceof Error ? err.message : 'Error al guardar'),
+        onSuccess: () => { toast.success('Predicción guardada'); reset(); setOpen(false) },
+        onError:   (err) => { const msg = err instanceof Error ? err.message : 'Error al guardar'; setError(msg); toast.error(msg) },
       },
     )
   }
@@ -644,8 +645,8 @@ export function PredictionsPage() {
     analyzeMutation.mutate(
       { id, syncFirst },
       {
-        onSuccess: (result) => setAnalysisResults(prev => ({ ...prev, [id]: result })),
-        onError:   (err)    => setAnalysisErrors(prev => ({ ...prev, [id]: err instanceof Error ? err.message : 'Error al analizar' })),
+        onSuccess: (result) => { setAnalysisResults(prev => ({ ...prev, [id]: result })); toast.success('Análisis completado') },
+        onError:   (err)    => { const msg = err instanceof Error ? err.message : 'Error al analizar'; setAnalysisErrors(prev => ({ ...prev, [id]: msg })); toast.error(msg) },
         onSettled: ()       => setAnalyzingId(null),
       },
     )
