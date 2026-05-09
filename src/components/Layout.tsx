@@ -1,10 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { LogOut, Shield, ChevronDown, Mail, BadgeCheck } from 'lucide-react'
+import { LogOut, Shield, ChevronDown, Mail, BadgeCheck, Sun, Moon } from 'lucide-react'
 import { useIsFetching } from '@tanstack/react-query'
 import { cn, LOTTERY_TYPES } from '@/lib/utils'
 import type { LotteryTypeMeta } from '@/types/lottery'
 import { useAuth } from '@/contexts/AuthContext'
+import { useTheme } from '@/contexts/ThemeContext'
 import { UserAvatar } from '@/components/ui/user-avatar'
 
 const navLink = ({ isActive }: { isActive: boolean }) =>
@@ -26,6 +27,8 @@ function GameNavItem({ meta }: { meta: LotteryTypeMeta }) {
 
 function ProfilePopover({ onClose }: { onClose: () => void }) {
   const { user, logout, isAdmin } = useAuth()
+  const { theme, toggleTheme } = useTheme()
+
   return (
     <div className="absolute left-2 right-2 top-full mt-1 z-50 rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 overflow-hidden">
       {/* Header */}
@@ -40,6 +43,7 @@ function ProfilePopover({ onClose }: { onClose: () => void }) {
           )}
         </div>
       </div>
+
       {/* Info */}
       <div className="px-4 py-2.5 flex flex-col gap-1.5">
         <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
@@ -47,8 +51,29 @@ function ProfilePopover({ onClose }: { onClose: () => void }) {
           <span className="truncate">{user?.email}</span>
         </div>
       </div>
+
       {/* Actions */}
-      <div className="px-2 pb-2">
+      <div className="px-2 pb-2 flex flex-col gap-0.5">
+        {/* Dark mode toggle */}
+        <button
+          onClick={toggleTheme}
+          className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
+        >
+          <span className="flex items-center gap-2.5">
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === 'dark' ? 'Modo claro' : 'Modo oscuro'}
+          </span>
+          <span className={cn(
+            'relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors',
+            theme === 'dark' ? 'bg-violet-600' : 'bg-zinc-200',
+          )}>
+            <span className={cn(
+              'inline-block h-4 w-4 rounded-full bg-white shadow-sm transition-transform',
+              theme === 'dark' ? 'translate-x-4' : 'translate-x-0',
+            )} />
+          </span>
+        </button>
+
         <button
           onClick={() => { onClose(); logout() }}
           className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors"

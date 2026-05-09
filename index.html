@@ -20,6 +20,16 @@
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Lotería MX — Análisis Estadístico" />
     <meta property="og:description" content="Análisis estadístico de Melate, Revancha y Revanchita." />
+    <!-- Dark mode: aplica clase antes del render para evitar flash -->
+    <script>
+      (function() {
+        var stored = localStorage.getItem('lottery_theme');
+        var prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        if (stored === 'dark' || (!stored && prefersDark)) {
+          document.documentElement.classList.add('dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
