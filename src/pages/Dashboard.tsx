@@ -6,6 +6,7 @@ import {
 import { LOTTERY_TYPES, formatNumber, formatDate } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'sonner'
+import { EmptyState } from '@/components/ui/empty-state'
 import {
   useStatistics, useSync, useDrawResults, useSavedPredictions, useDueNumbers,
 } from '@/api/queries'
@@ -182,7 +183,12 @@ function GameCard({ id }: { id: LotteryTypeId }) {
             </div>
           </>
         ) : (
-          <p className="text-sm text-zinc-500">Sin datos — sincroniza primero.</p>
+          <EmptyState
+            compact
+            illustration="noData"
+            title="Sin datos"
+            description="El administrador debe sincronizar primero."
+          />
         )}
 
         <div className="mt-auto flex gap-2 pt-1">

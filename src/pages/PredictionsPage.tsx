@@ -13,6 +13,7 @@ import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { CombinationGenerator } from '@/components/CombinationGenerator'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { EmptyState } from '@/components/ui/empty-state'
 import type {
   LotteryTypeId, DrawResult, PredictionAccuracyResult, GeneratedCombo, SavedPredictionSet,
 } from '@/types/lottery'
@@ -707,9 +708,11 @@ export function PredictionsPage() {
 
       {/* Empty state */}
       {!savedSetsLoading && savedSets.length === 0 && (
-        <p className="text-center text-sm text-zinc-400 dark:text-zinc-500 py-4">
-          Aún no hay predicciones guardadas. Genera una arriba y pulsa "Guardar predicción".
-        </p>
+        <EmptyState
+          illustration="predictions"
+          title="Aún no hay predicciones guardadas"
+          description='Genera combinaciones en cualquier juego y pulsa "Guardar predicción" para verlas aquí.'
+        />
       )}
 
       {/* Skeleton while loading */}
