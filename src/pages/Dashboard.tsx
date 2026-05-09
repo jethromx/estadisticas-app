@@ -4,6 +4,7 @@ import {
   AreaChart, Area, ResponsiveContainer, Tooltip as RechartsTip,
 } from 'recharts'
 import { LOTTERY_TYPES, formatNumber, formatDate } from '@/lib/utils'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   useStatistics, useSync, useDrawResults, useSavedPredictions, useDueNumbers,
 } from '@/api/queries'
@@ -128,6 +129,7 @@ function GameCard({ id }: { id: LotteryTypeId }) {
   const { data: stats, isLoading: statsLoading } = useStatistics(id)
   const { data: draws, isLoading: drawsLoading } = useDrawResults(id, 20)
   const sync  = useSync(id)
+  const { isAdmin } = useAuth()
   const days  = daysSince(stats?.lastDrawDate)
   const loading = statsLoading || drawsLoading
 
@@ -183,23 +185,25 @@ function GameCard({ id }: { id: LotteryTypeId }) {
         )}
 
         <div className="mt-auto flex gap-2 pt-1">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              sync.mutate(undefined, {
-                onSuccess: () => {
-                  window.dispatchEvent(new Event('storage'))
-                },
-              })
-            }}
-            disabled={sync.isPending}
-            className="flex-1"
-          >
-            {sync.isPending ? <Spinner className="h-3 w-3" /> : null}
-            Sincronizar
-          </Button>
-          <Button size="sm" className="flex-1" asChild>
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                sync.mutate(undefined, {
+                  onSuccess: () => {
+                    window.dispatchEvent(new Event('storage'))
+                  },
+                })
+              }}
+              disabled={sync.isPending}
+              className="flex-1"
+            >
+              {sync.isPending ? <Spinner className="h-3 w-3" /> : null}
+              Sincronizar
+            </Button>
+          )}
+          <Button size="sm" className={isAdmin ? 'flex-1' : 'w-full'} asChild>
             <Link to={`/game/${id}`}>Analizar</Link>
           </Button>
         </div>
@@ -422,6 +426,7 @@ function SyncAllButton() {
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export function Dashboard() {
+  const { isAdmin } = useAuth()
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
@@ -431,7 +436,7 @@ export function Dashboard() {
             {new Date().toLocaleDateString('es-MX', { dateStyle: 'long' })}
           </p>
         </div>
-        <SyncAllButton />
+        {isAdmin && <SyncAllButton />}
       </div>
 
       <GlobalKPIs />

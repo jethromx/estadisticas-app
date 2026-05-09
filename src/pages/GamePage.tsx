@@ -5,6 +5,7 @@ import {
   LineChart, Line, Legend,
 } from 'recharts'
 import { LOTTERY_TYPES, formatNumber, formatDate, formatPct, getLotteryMeta, cn } from '@/lib/utils'
+import { useAuth } from '@/contexts/AuthContext'
 import {
   useStatistics, useFrequencies, useHotNumbers, useColdNumbers,
   useDueNumbers, useWindowedFrequencies,
@@ -1586,6 +1587,7 @@ export function GamePage() {
 
   const meta = getLotteryMeta(typeId)
   const sync = useSync(typeId)
+  const { isAdmin } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const fromDate = searchParams.get('from') ?? undefined
   const toDate   = searchParams.get('to')   ?? undefined
@@ -1630,10 +1632,12 @@ export function GamePage() {
             </p>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={() => sync.mutate()} disabled={sync.isPending}>
-          {sync.isPending ? <Spinner className="h-4 w-4" /> : null}
-          Sincronizar
-        </Button>
+        {isAdmin && (
+          <Button variant="outline" size="sm" onClick={() => sync.mutate()} disabled={sync.isPending}>
+            {sync.isPending ? <Spinner className="h-4 w-4" /> : null}
+            Sincronizar
+          </Button>
+        )}
       </div>
 
       <Tabs defaultValue="due">
