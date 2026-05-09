@@ -1,6 +1,6 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
-import { LogOut, Shield, ChevronDown } from 'lucide-react'
+import { LogOut, Shield, ChevronDown, Mail, BadgeCheck } from 'lucide-react'
 import { useIsFetching } from '@tanstack/react-query'
 import { cn, LOTTERY_TYPES } from '@/lib/utils'
 import type { LotteryTypeMeta } from '@/types/lottery'
@@ -24,10 +24,62 @@ function GameNavItem({ meta }: { meta: LotteryTypeMeta }) {
   )
 }
 
+function ProfilePopover({ onClose }: { onClose: () => void }) {
+  const { user, logout, isAdmin } = useAuth()
+  return (
+    <div className="absolute left-2 right-2 top-full mt-1 z-50 rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center gap-3 px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border-b border-zinc-100 dark:border-zinc-700">
+        <UserAvatar username={user?.username ?? '?'} size="lg" />
+        <div className="min-w-0 flex-1">
+          <p className="truncate font-semibold text-zinc-900 dark:text-zinc-100">{user?.username}</p>
+          {isAdmin && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 dark:bg-violet-900/40 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:text-violet-300">
+              <BadgeCheck className="h-3 w-3" /> Admin
+            </span>
+          )}
+        </div>
+      </div>
+      {/* Info */}
+      <div className="px-4 py-2.5 flex flex-col gap-1.5">
+        <div className="flex items-center gap-2 text-xs text-zinc-500 dark:text-zinc-400">
+          <Mail className="h-3.5 w-3.5 shrink-0" />
+          <span className="truncate">{user?.email}</span>
+        </div>
+      </div>
+      {/* Actions */}
+      <div className="px-2 pb-2">
+        <button
+          onClick={() => { onClose(); logout() }}
+          className="flex w-full items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors"
+        >
+          <LogOut className="h-4 w-4" />
+          Cerrar sesión
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export function Layout() {
   const { user, logout, isAdmin } = useAuth()
   const [analysisOpen, setAnalysisOpen] = useState(true)
+  const [profileOpen, setProfileOpen] = useState(false)
+  const desktopProfileRef = useRef<HTMLDivElement>(null)
+  const mobileProfileRef  = useRef<HTMLDivElement>(null)
   const isFetching = useIsFetching()
+
+  useEffect(() => {
+    if (!profileOpen) return
+    function handleClick(e: MouseEvent) {
+      const t = e.target as Node
+      const insideDesktop = desktopProfileRef.current?.contains(t)
+      const insideMobile  = mobileProfileRef.current?.contains(t)
+      if (!insideDesktop && !insideMobile) setProfileOpen(false)
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [profileOpen])
 
   return (
     <div className="flex min-h-screen bg-zinc-50 dark:bg-zinc-950">
@@ -40,24 +92,25 @@ export function Layout() {
           <span className="text-base font-semibold text-zinc-900 dark:text-zinc-100">🎱 Lotería MX</span>
         </div>
 
-        {/* User / Logout — top */}
-        <div className="border-b border-zinc-200 dark:border-zinc-800 px-3 py-2">
-          <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
-            <div className="flex items-center gap-2 min-w-0">
-              <UserAvatar username={user?.username ?? '?'} size="sm" />
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{user?.username}</p>
-                {isAdmin && <p className="text-[10px] font-medium text-violet-600 dark:text-violet-400">Admin</p>}
-              </div>
+        {/* User — popover trigger */}
+        <div ref={desktopProfileRef} className="relative border-b border-zinc-200 dark:border-zinc-800 px-3 py-2">
+          <button
+            onClick={() => setProfileOpen(o => !o)}
+            className={cn(
+              'flex w-full items-center gap-2 rounded-lg px-2 py-1.5 transition-colors',
+              profileOpen
+                ? 'bg-zinc-100 dark:bg-zinc-800'
+                : 'hover:bg-zinc-50 dark:hover:bg-zinc-800/60',
+            )}
+          >
+            <UserAvatar username={user?.username ?? '?'} size="sm" />
+            <div className="min-w-0 flex-1 text-left">
+              <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{user?.username}</p>
+              {isAdmin && <p className="text-[10px] font-medium text-violet-600 dark:text-violet-400">Admin</p>}
             </div>
-            <button
-              onClick={logout}
-              title="Cerrar sesión"
-              className="flex shrink-0 items-center justify-center rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
-            </button>
-          </div>
+            <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform', profileOpen && 'rotate-180')} />
+          </button>
+          {profileOpen && <ProfilePopover onClose={() => setProfileOpen(false)} />}
         </div>
 
         <nav className="flex flex-col gap-1 p-3 flex-1 overflow-y-auto">
@@ -122,18 +175,20 @@ export function Layout() {
         {/* Mobile header */}
         <header className="flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
           <span className="text-base font-semibold text-zinc-900 dark:text-zinc-100">🎱 Lotería MX</span>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5">
+          <div ref={mobileProfileRef} className="relative">
+            <button
+              onClick={() => setProfileOpen(o => !o)}
+              className="flex items-center gap-1.5 rounded-lg px-2 py-1 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+            >
               <UserAvatar username={user?.username ?? '?'} size="sm" />
               <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{user?.username}</span>
-            </div>
-            <button
-              onClick={logout}
-              title="Cerrar sesión"
-              className="flex items-center justify-center rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
-            >
-              <LogOut className="h-4 w-4" />
+              <ChevronDown className={cn('h-3.5 w-3.5 text-zinc-400 transition-transform', profileOpen && 'rotate-180')} />
             </button>
+            {profileOpen && (
+              <div className="absolute right-0 top-full mt-1 w-64 z-50 rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 overflow-hidden">
+                <ProfilePopover onClose={() => setProfileOpen(false)} />
+              </div>
+            )}
           </div>
         </header>
 
