@@ -25,12 +25,12 @@ function GameNavItem({ meta }: { meta: LotteryTypeMeta }) {
   )
 }
 
-function ProfilePopover({ onClose }: { onClose: () => void }) {
+function ProfilePopoverContent({ onClose }: { onClose: () => void }) {
   const { user, logout, isAdmin } = useAuth()
   const { theme, toggleTheme } = useTheme()
 
   return (
-    <div className="absolute left-2 right-2 top-full mt-1 z-50 rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 overflow-hidden">
+    <>
       {/* Header */}
       <div className="flex items-center gap-3 px-4 py-3 bg-zinc-50 dark:bg-zinc-800/60 border-b border-zinc-100 dark:border-zinc-700">
         <UserAvatar username={user?.username ?? '?'} size="lg" />
@@ -54,7 +54,6 @@ function ProfilePopover({ onClose }: { onClose: () => void }) {
 
       {/* Actions */}
       <div className="px-2 pb-2 flex flex-col gap-0.5">
-        {/* Dark mode toggle */}
         <button
           onClick={toggleTheme}
           className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-zinc-800 transition-colors"
@@ -82,7 +81,7 @@ function ProfilePopover({ onClose }: { onClose: () => void }) {
           Cerrar sesión
         </button>
       </div>
-    </div>
+    </>
   )
 }
 
@@ -135,7 +134,11 @@ export function Layout() {
             </div>
             <ChevronDown className={cn('h-3.5 w-3.5 shrink-0 text-zinc-400 transition-transform', profileOpen && 'rotate-180')} />
           </button>
-          {profileOpen && <ProfilePopover onClose={() => setProfileOpen(false)} />}
+          {profileOpen && (
+            <div className="absolute left-2 right-2 top-full mt-1 z-50 rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 overflow-hidden">
+              <ProfilePopoverContent onClose={() => setProfileOpen(false)} />
+            </div>
+          )}
         </div>
 
         <nav className="flex flex-col gap-1 p-3 flex-1 overflow-y-auto">
@@ -216,8 +219,8 @@ export function Layout() {
               <ChevronDown className={cn('h-3.5 w-3.5 text-zinc-400 transition-transform', profileOpen && 'rotate-180')} />
             </button>
             {profileOpen && (
-              <div className="fixed right-4 top-14 w-64 z-100 rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 overflow-hidden">
-                <ProfilePopover onClose={() => setProfileOpen(false)} />
+              <div className="fixed right-4 top-14 w-72 z-100 rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 overflow-hidden">
+                <ProfilePopoverContent onClose={() => setProfileOpen(false)} />
               </div>
             )}
           </div>
