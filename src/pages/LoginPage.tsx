@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { authApi } from '@/api/auth'
 import { useAuth } from '@/contexts/AuthContext'
 import { Spinner } from '@/components/ui/spinner'
@@ -96,10 +96,7 @@ export function LoginPage() {
 
         {/* Footer */}
         <p className="mt-4 text-center text-sm text-zinc-500 dark:text-zinc-400">
-          ¿No tienes cuenta?{' '}
-          <Link to="/register" className="font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400">
-            Regístrate
-          </Link>
+          Solicita acceso a tu administrador.
         </p>
       </div>
     </div>

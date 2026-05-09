@@ -9,7 +9,6 @@ import { GamePage } from '@/pages/GamePage'
 import { ComparativePage } from '@/pages/ComparativePage'
 import { PredictionsPage } from '@/pages/PredictionsPage'
 import { LoginPage } from '@/pages/LoginPage'
-import { RegisterPage } from '@/pages/RegisterPage'
 import { AdminDashboard } from '@/pages/admin/AdminDashboard'
 import { LandingPage } from '@/pages/LandingPage'
 
@@ -23,7 +22,6 @@ export default function App() {
           <Routes>
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
             <Route element={<ProtectedRoute />}>
               <Route element={<Layout />}>
                 <Route path="dashboard" element={<Dashboard />} />

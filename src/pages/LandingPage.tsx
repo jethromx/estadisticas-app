@@ -81,10 +81,10 @@ export function LandingPage() {
               Iniciar sesión
             </Link>
             <Link
-              to="/register"
+              to="/login"
               className="rounded-lg bg-violet-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-violet-700 transition-colors"
             >
-              Registrarse
+              Iniciar sesión
             </Link>
           </div>
         </div>
@@ -124,10 +124,10 @@ export function LandingPage() {
 
           <div className="mt-8 flex flex-wrap gap-3">
             <Link
-              to="/register"
+              to="/login"
               className="rounded-xl bg-white px-6 py-3 text-sm font-bold text-violet-800 shadow-lg hover:bg-violet-50 transition-colors"
             >
-              Comenzar ahora →
+              Iniciar sesión →
             </Link>
             <a
               href="#como-funciona"
@@ -347,21 +347,15 @@ export function LandingPage() {
             Empieza tu año de juego inteligente
           </h2>
           <p className="mt-4 text-lg text-violet-100">
-            Crea tu cuenta, sincroniza los datos históricos y genera tus primeras combinaciones en minutos.
+            Solicita acceso a tu administrador, inicia sesión y genera tus primeras combinaciones en minutos.
           </p>
 
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
-              to="/register"
+              to="/login"
               className="rounded-xl bg-white px-8 py-3.5 text-base font-bold text-violet-800 shadow-xl hover:bg-violet-50 transition-colors"
             >
-              Crear cuenta gratuita
-            </Link>
-            <Link
-              to="/login"
-              className="rounded-xl border border-white/30 bg-white/10 px-8 py-3.5 text-base font-medium text-white hover:bg-white/20 transition-colors"
-            >
-              Ya tengo cuenta
+              Iniciar sesión
             </Link>
           </div>
         </div>
