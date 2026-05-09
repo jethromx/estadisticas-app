@@ -455,7 +455,7 @@ function PredictionsTab() {
                         key={i}
                         className="flex items-center gap-1 rounded-lg bg-zinc-100 dark:bg-zinc-800 px-2 py-1"
                       >
-                        {combo.numbers.map((n, j) => (
+                        {[...combo.numbers].sort((a: number, b: number) => a - b).map((n, j) => (
                           <span
                             key={j}
                             className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-violet-600 text-xs font-bold text-white"

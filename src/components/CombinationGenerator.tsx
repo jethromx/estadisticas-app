@@ -552,7 +552,7 @@ export function CombinationGenerator() {
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 w-5 shrink-0">#{idx + 1}</span>
                       <div className="flex flex-wrap gap-1.5 flex-1">
-                        {combo.numbers.map(n => (
+                        {[...combo.numbers].sort((a, b) => a - b).map(n => (
                           <span key={n}
                             className="inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-base text-white shadow-sm"
                             style={{ background: n % 2 !== 0 ? '#7c3aed' : '#0ea5e9' }}>

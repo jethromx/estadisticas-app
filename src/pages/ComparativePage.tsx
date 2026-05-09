@@ -1189,7 +1189,7 @@ function ArimaComparison({
           Combinación ARIMA — Top-6 promedio (3 impares + 3 pares)
         </p>
         <div className="flex flex-wrap gap-3">
-          {combinedTop6.numbers.map(n => {
+          {[...combinedTop6.numbers].sort((a, b) => a - b).map(n => {
             const avg = combinedTop6.avgForecast[n] ?? 0
             const norm = avg / maxForecast
             return (
@@ -1921,7 +1921,7 @@ function ComparativeSuggestions({
                   {row.label}
                 </span>
                 <div className="flex flex-wrap gap-1.5">
-                  {row.numbers.map(n => {
+                  {[...row.numbers].sort((a, b) => a - b).map(n => {
                     const count = coincidenceMap[n] ?? 0
                     return (
                       <span
@@ -1997,7 +1997,7 @@ function ComparativeSuggestions({
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    {combo.numbers.map(n => {
+                    {[...combo.numbers].sort((a, b) => a - b).map(n => {
                       const count = coincidenceMap[n] ?? 0
                       return (
                         <Tip
@@ -2122,7 +2122,7 @@ function ComparativeSuggestions({
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {combo.numbers.map(n => (
+                      {[...combo.numbers].sort((a, b) => a - b).map(n => (
                         <Tip
                           key={n}
                           content={`Nº${n} aparece en ${combo.hits[n] ?? 0} de las 5 combinaciones principales. ${(combo.hits[n] ?? 0) >= 4 ? 'Respaldo muy alto' : (combo.hits[n] ?? 0) === 3 ? 'Respaldo alto' : 'Respaldo medio'}`}
@@ -2360,7 +2360,7 @@ function ComparativeSuggestions({
                       </div>
 
                       <div className="flex flex-wrap gap-4">
-                        {prop.numbers.map(n => {
+                        {[...prop.numbers].sort((a, b) => a - b).map(n => {
                           const votes = megaVoteMap[n] ?? 0
                           const norm  = votes / maxVotes
                           return (

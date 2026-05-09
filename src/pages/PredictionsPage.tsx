@@ -341,7 +341,7 @@ function ComboLookup({ drawsMap }: { drawsMap: Record<string, DrawResult[]> }) {
           <div className="flex flex-col gap-3 pt-1">
             {/* Numbers display */}
             <div className="flex gap-2 flex-wrap">
-              {result.numbers.map(n => (
+              {[...result.numbers].sort((a, b) => a - b).map(n => (
                 <span
                   key={n}
                   className={cn(
@@ -854,7 +854,7 @@ export function PredictionsPage() {
 
                         {/* número pills */}
                         <div className="flex gap-1.5 flex-wrap flex-1">
-                          {combo.numbers.map(n => (
+                          {[...combo.numbers].sort((a, b) => a - b).map(n => (
                             <span
                               key={n}
                               className={cn(

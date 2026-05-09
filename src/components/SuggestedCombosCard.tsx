@@ -64,7 +64,7 @@ export function SuggestedCombosCard({
                 </div>
               </div>
               <div className="flex flex-wrap gap-4">
-                {combo.numbers.map(n => (
+                {[...combo.numbers].sort((a, b) => a - b).map(n => (
                   <div key={n} className="flex flex-col items-center gap-1.5">
                     <span
                       className="inline-flex h-11 w-11 items-center justify-center rounded-full font-bold text-base text-white shadow-sm"

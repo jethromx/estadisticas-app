@@ -402,7 +402,7 @@ function RecentPredictions() {
                 <p className="mt-1 text-[11px] text-zinc-400">{meta.icon} {meta.label} · {p.combos.length} combo{p.combos.length !== 1 ? 's' : ''}</p>
               )}
               <div className="mt-2 flex flex-wrap gap-1">
-                {p.combos[0]?.numbers.map((n: number) => (
+                {[...(p.combos[0]?.numbers ?? [])].sort((a: number, b: number) => a - b).map((n: number) => (
                   <span
                     key={n}
                     className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
