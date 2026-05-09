@@ -39,6 +39,26 @@ export function Layout() {
           <span className="text-base font-semibold text-zinc-900 dark:text-zinc-100">🎱 Lotería MX</span>
         </div>
 
+        {/* User / Logout — top */}
+        <div className="border-b border-zinc-200 dark:border-zinc-800 px-3 py-2">
+          <div className="flex items-center justify-between gap-2 rounded-lg px-2 py-1.5">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-violet-100 text-sm dark:bg-violet-900/40">👤</span>
+              <div className="min-w-0">
+                <p className="truncate text-sm font-medium text-zinc-900 dark:text-zinc-100">{user?.username}</p>
+                {isAdmin && <p className="text-[10px] font-medium text-violet-600 dark:text-violet-400">Admin</p>}
+              </div>
+            </div>
+            <button
+              onClick={logout}
+              title="Cerrar sesión"
+              className="flex shrink-0 items-center justify-center rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+
         <nav className="flex flex-col gap-1 p-3 flex-1 overflow-y-auto">
 
           {/* Inicio */}
@@ -83,25 +103,11 @@ export function Layout() {
           {/* Admin */}
           {isAdmin && (
             <NavLink to="/admin" className={navLink}>
-              <Shield className="h-4.5 w-4.5" />
+              <Shield className="h-4 w-4" />
               <span>Admin</span>
             </NavLink>
           )}
         </nav>
-
-        {/* User / Logout */}
-        <div className="border-t border-zinc-200 dark:border-zinc-800 p-3">
-          <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-zinc-500 dark:text-zinc-400">
-            <span className="truncate">👤 {user?.username}</span>
-          </div>
-          <button
-            onClick={logout}
-            className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-zinc-600 hover:bg-zinc-100 hover:text-zinc-900 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-100 transition-colors"
-          >
-            <LogOut className="h-4 w-4" />
-            <span>Cerrar sesión</span>
-          </button>
-        </div>
       </aside>
 
       {/* ── Main content ── */}
@@ -113,8 +119,21 @@ export function Layout() {
         )} />
 
         {/* Mobile header */}
-        <header className="flex h-14 items-center border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
+        <header className="flex h-14 items-center justify-between border-b border-zinc-200 bg-white px-4 dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
           <span className="text-base font-semibold text-zinc-900 dark:text-zinc-100">🎱 Lotería MX</span>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-xs dark:bg-violet-900/40">👤</span>
+              <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">{user?.username}</span>
+            </div>
+            <button
+              onClick={logout}
+              title="Cerrar sesión"
+              className="flex items-center justify-center rounded-lg p-1.5 text-zinc-400 hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-zinc-200 transition-colors"
+            >
+              <LogOut className="h-4 w-4" />
+            </button>
+          </div>
         </header>
 
         <div className="flex-1 p-4 pb-24 md:p-6 lg:pb-6">
