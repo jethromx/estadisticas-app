@@ -14,6 +14,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
+import { GameCardSkeleton, RecentPredictionSkeleton } from '@/components/ui/skeleton'
 import type { LotteryTypeId, LotteryStatistics, DrawResult, SavedPredictionSet, DueNumber } from '@/types/lottery'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -152,7 +153,7 @@ function GameCard({ id }: { id: LotteryTypeId }) {
 
       <CardContent className="flex flex-1 flex-col gap-3">
         {loading ? (
-          <Spinner className="mx-auto my-4" />
+          <GameCardSkeleton />
         ) : stats ? (
           <>
             <dl className="grid grid-cols-3 gap-2 text-sm">
@@ -354,7 +355,11 @@ function RecentPredictions() {
     REVANCHITA: drawsRevanchita ?? [],
   }
 
-  if (isLoading) return <Spinner className="mx-auto" />
+  if (isLoading) return (
+    <div className="flex flex-col gap-3">
+      {[...Array(3)].map((_, i) => <RecentPredictionSkeleton key={i} />)}
+    </div>
+  )
   if (!predictions?.length) return null
 
   const recent = [...predictions]

@@ -14,6 +14,7 @@ import { CombinationGenerator } from '@/components/CombinationGenerator'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { EmptyState } from '@/components/ui/empty-state'
+import { PredictionCardSkeleton } from '@/components/ui/skeleton'
 import type {
   LotteryTypeId, DrawResult, PredictionAccuracyResult, GeneratedCombo, SavedPredictionSet,
 } from '@/types/lottery'
@@ -718,9 +719,7 @@ export function PredictionsPage() {
       {/* Skeleton while loading */}
       {savedSetsLoading && (
         <div className="flex flex-col gap-3">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-14 rounded-xl bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
-          ))}
+          {[...Array(3)].map((_, i) => <PredictionCardSkeleton key={i} />)}
         </div>
       )}
 
