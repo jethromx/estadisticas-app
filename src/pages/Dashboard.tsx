@@ -229,7 +229,8 @@ function GameCard({ id }: { id: LotteryTypeId }) {
 function GlobalKPIs() {
   const games = ['MELATE', 'REVANCHA', 'REVANCHITA'] as const
   const results = games.map(id => useStatistics(id))  // eslint-disable-line react-hooks/rules-of-hooks
-  const { data: predictions } = useSavedPredictions()
+  const { data: predictionsPage } = useSavedPredictions()
+  const predCount = predictionsPage?.totalElements ?? 0
 
   const totalDraws = results.reduce((acc, r) => acc + (r.data?.totalDraws ?? 0), 0)
   const loading    = results.some(r => r.isLoading)
@@ -259,7 +260,7 @@ function GlobalKPIs() {
         },
         {
           label: 'Predicciones',
-          value: predictions ? String(predictions.length) : '…',
+          value: predictionsPage ? String(predCount) : '…',
           sub: 'Combinaciones guardadas',
         },
       ].map(({ label, value, sub }) => (
@@ -344,7 +345,8 @@ function DueNumbersSection() {
 // ── Predicciones recientes ────────────────────────────────────────────────────
 
 function RecentPredictions() {
-  const { data: predictions, isLoading } = useSavedPredictions()
+  const { data: predictionsPage, isLoading } = useSavedPredictions()
+  const predictions = predictionsPage?.content ?? []
   const { data: drawsMelate     } = useDrawResults('MELATE')
   const { data: drawsRevancha   } = useDrawResults('REVANCHA')
   const { data: drawsRevanchita } = useDrawResults('REVANCHITA')
@@ -360,7 +362,7 @@ function RecentPredictions() {
       {[...Array(3)].map((_, i) => <RecentPredictionSkeleton key={i} />)}
     </div>
   )
-  if (!predictions?.length) return null
+  if (!predictions.length) return null
 
   const recent = [...predictions]
     .sort((a, b) => new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime())
