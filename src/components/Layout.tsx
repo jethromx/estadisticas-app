@@ -216,7 +216,7 @@ export function Layout() {
               <ChevronDown className={cn('h-3.5 w-3.5 text-zinc-400 transition-transform', profileOpen && 'rotate-180')} />
             </button>
             {profileOpen && (
-              <div className="absolute right-0 top-full mt-1 w-64 z-50 rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 overflow-hidden">
+              <div className="fixed right-4 top-14 w-64 z-100 rounded-xl border border-zinc-200 bg-white shadow-lg dark:border-zinc-700 dark:bg-zinc-900 overflow-hidden">
                 <ProfilePopover onClose={() => setProfileOpen(false)} />
               </div>
             )}
