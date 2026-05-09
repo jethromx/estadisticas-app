@@ -21,6 +21,7 @@ import type {
   PositionAnalysis,
   ConsecutiveAnalysis,
   CalendarFrequency,
+  PagedResponse,
 } from '@/types/lottery'
 
 const BASE        = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/lottery`
@@ -135,8 +136,8 @@ async function predRequest<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export const predictionsApi = {
-  getAll: () =>
-    predRequest<SavedPredictionSet[]>(''),
+  getPaged: (page: number, size: number) =>
+    predRequest<PagedResponse<SavedPredictionSet>>(`?page=${page}&size=${size}`),
 
   save: (body: SavePredictionRequest) =>
     predRequest<SavedPredictionSet>('', {
@@ -152,4 +153,7 @@ export const predictionsApi = {
     predRequest<PredictionAccuracyResult>(`/${id}/analyze?syncFirst=${syncFirst}`, {
       method: 'POST',
     }),
+
+  toggleFavorite: (id: string) =>
+    predRequest<SavedPredictionSet>(`/${id}/favorite`, { method: 'PATCH' }),
 }

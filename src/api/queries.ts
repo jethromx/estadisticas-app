@@ -196,10 +196,10 @@ export function useSync(type: LotteryTypeId | 'ALL') {
   })
 }
 
-export function useSavedPredictions() {
+export function useSavedPredictions(page = 0, size = 20) {
   return useQuery({
-    queryKey: ['savedPredictions'],
-    queryFn:  () => predictionsApi.getAll(),
+    queryKey: ['savedPredictions', page, size],
+    queryFn:  () => predictionsApi.getPaged(page, size),
   })
 }
 
@@ -215,6 +215,14 @@ export function useDeletePrediction() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (id: string) => predictionsApi.delete(id),
+    onSuccess:  () => qc.invalidateQueries({ queryKey: ['savedPredictions'] }),
+  })
+}
+
+export function useToggleFavorite() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (id: string) => predictionsApi.toggleFavorite(id),
     onSuccess:  () => qc.invalidateQueries({ queryKey: ['savedPredictions'] }),
   })
 }

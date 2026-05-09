@@ -561,6 +561,16 @@ export function CombinationGenerator() {
                         ))}
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
+                        {combo.scores.consensus > 0 && (
+                          <span className={cn(
+                            'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold',
+                            combo.scores.consensus >= 0.66 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                              : combo.scores.consensus >= 0.33 ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
+                              : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
+                          )}>
+                            IA {Math.min(100, Math.round(combo.scores.consensus * 100))}%
+                          </span>
+                        )}
                         <Tip content={`Suma de los 6 números. Rango óptimo: ${sMin}–${sMax}. ${combo.inRange ? '✓ Dentro del rango' : '⚠ Fuera del rango'}`}>
                           <span className={cn('text-sm font-bold tabular-nums cursor-help',
                             combo.inRange ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>

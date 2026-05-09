@@ -13,13 +13,14 @@ import {
   useBalanceAnalysis, useSumDistribution, useSync,
   usePairAnalysis, useChiSquare, useBacktest, useBayesianAnalysis,
   useSavePrediction, usePositionAnalysis, useConsecutiveAnalysis, useCalendarFrequency,
+  useDrawResults,
 } from '@/api/queries'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner, PageSpinner } from '@/components/ui/spinner'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import type { LotteryTypeId, NumberFrequency, DueNumber, WindowedFrequency, BalanceAnalysis, SumDistribution, NumberPair, ChiSquareResult, BayesianNumber, GeneratedCombo, PositionAnalysis, PositionStats, ConsecutiveAnalysis, CalendarFrequency } from '@/types/lottery'
+import type { LotteryTypeId, NumberFrequency, DueNumber, WindowedFrequency, BalanceAnalysis, SumDistribution, NumberPair, ChiSquareResult, BayesianNumber, GeneratedCombo, PositionAnalysis, PositionStats, ConsecutiveAnalysis, CalendarFrequency, DrawResult } from '@/types/lottery'
 import { SuggestedCombosCard, buildCombo } from '@/components/SuggestedCombosCard'
 import type { SuggestedCombo } from '@/components/SuggestedCombosCard'
 import { InfoTip } from '@/components/ui/info-tip'
@@ -1577,6 +1578,44 @@ function NumberPickerTab({
   )
 }
 
+// ── Draw History ─────────────────────────────────────────────────────────────
+
+function DrawHistoryTab({ typeId }: { typeId: LotteryTypeId }) {
+  const meta = getLotteryMeta(typeId)
+  const { data: draws, isLoading } = useDrawResults(typeId, 20)
+
+  if (isLoading) return <PageSpinner />
+  if (!draws || draws.length === 0) return (
+    <p className="text-sm text-zinc-500 dark:text-zinc-400 py-8 text-center">Sin sorteos registrados.</p>
+  )
+
+  return (
+    <div className="flex flex-col gap-2">
+      {(draws as DrawResult[]).map(draw => (
+        <Card key={draw.drawNumber} className="overflow-hidden">
+          <CardContent className="flex flex-wrap items-center gap-4 py-3 px-4">
+            <div className="shrink-0 min-w-[90px]">
+              <p className="text-xs font-semibold text-zinc-500 dark:text-zinc-400">Sorteo #{draw.drawNumber}</p>
+              <p className="text-xs text-zinc-400 dark:text-zinc-500">{formatDate(draw.drawDate)}</p>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {[...draw.numbers].sort((a, b) => a - b).map(n => (
+                <span
+                  key={n}
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold text-white shadow-sm"
+                  style={{ background: meta.color }}
+                >
+                  {n}
+                </span>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
+  )
+}
+
 // ── Page ─────────────────────────────────────────────────────────────────────
 
 export function GamePage() {
@@ -1665,6 +1704,8 @@ export function GamePage() {
           <TabsTrigger value="calendar">Calendario</TabsTrigger>
           <TabsTrigger value="consecutive">Consecutivos</TabsTrigger>
           <TabsTrigger value="picker">Mis números</TabsTrigger>
+          <span className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 self-center" />
+          <TabsTrigger value="draws">Últimos sorteos</TabsTrigger>
         </TabsList>
 
         {/* ── Por salir ── */}
@@ -2012,6 +2053,11 @@ export function GamePage() {
             savePickerMutation={savePickerMutation}
             pickerSaved={pickerSaved}
           />
+        </TabsContent>
+
+        {/* ── Últimos sorteos ── */}
+        <TabsContent value="draws">
+          <DrawHistoryTab typeId={typeId} />
         </TabsContent>
 
       </Tabs>

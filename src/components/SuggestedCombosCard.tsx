@@ -1,6 +1,28 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import type { GeneratedCombo } from '@/types/lottery'
+
+function confidencePct(scores: GeneratedCombo['scores']): number | null {
+  const raw = scores.consensus
+  if (!raw || raw === 0) return null
+  return Math.min(100, Math.round(raw * 100))
+}
+
+function ConfidenceBadge({ scores }: { scores: GeneratedCombo['scores'] }) {
+  const pct = confidencePct(scores)
+  if (pct === null) return null
+  return (
+    <span className={cn(
+      'inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold',
+      pct >= 66 ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+        : pct >= 33 ? 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
+        : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400',
+    )}>
+      IA {pct}%
+    </span>
+  )
+}
 
 export type SuggestedCombo = {
   key:   string
@@ -74,8 +96,9 @@ export function SuggestedCombosCard({
                     </span>
                   </div>
                 ))}
-                <div className="flex flex-col justify-center ml-auto">
+                <div className="flex flex-col justify-center items-end gap-1 ml-auto">
                   <span className="text-sm font-bold tabular-nums text-zinc-700 dark:text-zinc-300">Σ {combo.sum}</span>
+                  <ConfidenceBadge scores={combo.scores} />
                 </div>
               </div>
             </div>

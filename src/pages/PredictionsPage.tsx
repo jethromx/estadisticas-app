@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import {
   useSavedPredictions, useDeletePrediction,
-  useAnalyzePrediction, useDrawResults, useSavePrediction,
+  useAnalyzePrediction, useDrawResults, useSavePrediction, useToggleFavorite,
 } from '@/api/queries'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Tooltip as Tip } from '@/components/ui/tooltip'
@@ -615,7 +615,13 @@ function ManualComboCreator() {
 }
 
 export function PredictionsPage() {
-  const { data: savedSets = [], isLoading: savedSetsLoading } = useSavedPredictions()
+  const [page, setPage] = useState(0)
+  const [showFavoritesOnly, setShowFavoritesOnly] = useState(false)
+  const { data: predictionsPage, isLoading: savedSetsLoading } = useSavedPredictions(page, 20)
+  const savedSets         = predictionsPage?.content ?? []
+  const totalPages        = predictionsPage?.totalPages ?? 1
+  const totalElements     = predictionsPage?.totalElements ?? 0
+  const visibleSets       = showFavoritesOnly ? savedSets.filter(s => s.favorite) : savedSets
 
   const { data: drawsMelate     } = useDrawResults('MELATE')
   const { data: drawsRevancha   } = useDrawResults('REVANCHA')
@@ -627,8 +633,9 @@ export function PredictionsPage() {
     REVANCHITA: drawsRevanchita ?? [],
   }
 
-  const deleteMutation  = useDeletePrediction()
-  const analyzeMutation = useAnalyzePrediction()
+  const deleteMutation        = useDeletePrediction()
+  const analyzeMutation       = useAnalyzePrediction()
+  const toggleFavoriteMutation = useToggleFavorite()
 
   const listRef = useRef<HTMLDivElement>(null)
   const [expandedSetId,  setExpandedSetId]  = useState<string | null>(null)
@@ -657,7 +664,7 @@ export function PredictionsPage() {
   // Auto-analyze when expanding a prediction that has new draws and no result yet
   useEffect(() => {
     if (!expandedSetId) return
-    const set = savedSets.find(s => s.id === expandedSetId)
+    const set = visibleSets.find(s => s.id === expandedSetId)
     if (!set) return
     const hasNewDraws = GAMES.some(g =>
       (drawsMap[g] ?? []).some(d => !set.latestDrawDate || d.drawDate > set.latestDrawDate)
@@ -669,11 +676,11 @@ export function PredictionsPage() {
   }, [expandedSetId])
 
   const virtualizer = useVirtualizer({
-    count: savedSets.length,
+    count: visibleSets.length,
     getScrollElement: () => listRef.current,
     estimateSize: useCallback((i: number) =>
-      expandedSetId === savedSets[i]?.id ? 420 : 72
-    , [expandedSetId, savedSets]),
+      expandedSetId === visibleSets[i]?.id ? 420 : 72
+    , [expandedSetId, visibleSets]),
     overscan: 3,
   })
 
@@ -702,17 +709,37 @@ export function PredictionsPage() {
       <div className="flex items-center gap-3 pt-2">
         <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-700" />
         <span className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
-          Predicciones guardadas
+          Predicciones guardadas {totalElements > 0 && `(${totalElements})`}
         </span>
         <div className="flex-1 h-px bg-zinc-200 dark:bg-zinc-700" />
       </div>
 
+      {/* Filters */}
+      {!savedSetsLoading && savedSets.length > 0 && (
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFavoritesOnly(v => !v)}
+            className={cn(
+              'flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-medium transition-colors border',
+              showFavoritesOnly
+                ? 'bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/30 dark:text-amber-300 dark:border-amber-700'
+                : 'bg-white text-zinc-500 border-zinc-200 hover:border-zinc-300 dark:bg-zinc-900 dark:text-zinc-400 dark:border-zinc-700',
+            )}
+          >
+            ⭐ Solo favoritos
+          </button>
+        </div>
+      )}
+
       {/* Empty state */}
-      {!savedSetsLoading && savedSets.length === 0 && (
+      {!savedSetsLoading && visibleSets.length === 0 && (
         <EmptyState
           illustration="predictions"
-          title="Aún no hay predicciones guardadas"
-          description='Genera combinaciones en cualquier juego y pulsa "Guardar predicción" para verlas aquí.'
+          title={showFavoritesOnly ? 'No hay predicciones favoritas' : 'Aún no hay predicciones guardadas'}
+          description={showFavoritesOnly
+            ? 'Marca predicciones con ⭐ para verlas aquí.'
+            : 'Genera combinaciones en cualquier juego y pulsa "Guardar predicción" para verlas aquí.'
+          }
         />
       )}
 
@@ -724,7 +751,7 @@ export function PredictionsPage() {
       )}
 
       {/* Prediction cards — virtualised */}
-      {!savedSetsLoading && savedSets.length > 0 && (
+      {!savedSetsLoading && visibleSets.length > 0 && (
         <div
           ref={listRef}
           className="overflow-y-auto rounded-xl"
@@ -732,7 +759,7 @@ export function PredictionsPage() {
         >
           <div style={{ height: `${virtualizer.getTotalSize()}px`, position: 'relative' }}>
             {virtualizer.getVirtualItems().map(virtualRow => {
-              const set = savedSets[virtualRow.index]
+              const set = visibleSets[virtualRow.index]
               const allNewDraws = GAMES.flatMap(g =>
                 (drawsMap[g] ?? []).filter(d => !set.latestDrawDate || d.drawDate > set.latestDrawDate),
               )
@@ -810,6 +837,19 @@ export function PredictionsPage() {
                   <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
                   <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
                 </svg>
+              </button>
+              <button
+                onClick={() => toggleFavoriteMutation.mutate(set.id)}
+                disabled={toggleFavoriteMutation.isPending}
+                className={cn(
+                  'ml-1 transition-colors text-base',
+                  set.favorite
+                    ? 'text-amber-400 hover:text-amber-500'
+                    : 'text-zinc-300 dark:text-zinc-600 hover:text-amber-400',
+                )}
+                title={set.favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
+              >
+                {set.favorite ? '⭐' : '☆'}
               </button>
               <button
                 onClick={() => deleteSet(set.id)}
@@ -1033,6 +1073,29 @@ export function PredictionsPage() {
               )
             })}
           </div>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!savedSetsLoading && totalPages > 1 && (
+        <div className="flex items-center justify-center gap-3 pt-2">
+          <button
+            onClick={() => setPage(p => Math.max(0, p - 1))}
+            disabled={page === 0}
+            className="rounded-lg border border-zinc-200 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            ← Anterior
+          </button>
+          <span className="text-xs text-zinc-500 dark:text-zinc-400">
+            Página {page + 1} de {totalPages}
+          </span>
+          <button
+            onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+            disabled={page >= totalPages - 1}
+            className="rounded-lg border border-zinc-200 dark:border-zinc-700 px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Siguiente →
+          </button>
         </div>
       )}
     </div>

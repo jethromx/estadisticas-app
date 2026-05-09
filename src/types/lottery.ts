@@ -191,6 +191,15 @@ export interface SavedPredictionSet {
   latestDrawDate: string | null
   combos:         GeneratedCombo[]
   lotteryType?:   string | null
+  favorite:       boolean
+}
+
+export interface PagedResponse<T> {
+  content:       T[]
+  page:          number
+  size:          number
+  totalElements: number
+  totalPages:    number
 }
 
 export interface SavePredictionRequest {
