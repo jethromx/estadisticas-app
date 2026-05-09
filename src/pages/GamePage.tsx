@@ -135,7 +135,7 @@ function WindowedFrequenciesTab({ typeId }: { typeId: LotteryTypeId }) {
   const { data: w200 } = useWindowedFrequencies(typeId, 200)
   const { data: w500 } = useWindowedFrequencies(typeId, 500)
   const saveMutation = useSavePrediction()
-  const [savedKey, setSavedKey] = useState<string | null>(null)
+  const [savedKey] = useState<string | null>(null)
 
   const chartData = data?.map(wf => ({
     number: wf.number,
@@ -391,7 +391,7 @@ function BalanceTab({ balance, typeId }: { balance: BalanceAnalysis; typeId: Lot
   const totalHigh = Object.values(balance.highLowDistribution).reduce((a, b) => a + b, 0)
   const { data: freqs } = useFrequencies(typeId)
   const saveMutation = useSavePrediction()
-  const [savedKey, setSavedKey] = useState<string | null>(null)
+  const [savedKey] = useState<string | null>(null)
 
   const balanceCombos = useMemo(() => {
     const k    = balance.numbersPerDraw
@@ -609,7 +609,7 @@ function SumDistributionTab({ dist, typeId }: { dist: SumDistribution; typeId: L
 
   const { data: freqs } = useFrequencies(typeId)
   const saveMutation = useSavePrediction()
-  const [savedKey, setSavedKey] = useState<string | null>(null)
+  const [savedKey] = useState<string | null>(null)
   const meta = getLotteryMeta(typeId)
 
   const sumCombos = useMemo(() => {
@@ -789,7 +789,7 @@ function PairAnalysisTab({ typeId }: { typeId: LotteryTypeId }) {
   const [limit, setLimit] = useState<number>(20)
   const { data, isLoading } = usePairAnalysis(typeId, limit)
   const saveMutation = useSavePrediction()
-  const [savedKey, setSavedKey] = useState<string | null>(null)
+  const [savedKey] = useState<string | null>(null)
   const meta = getLotteryMeta(typeId)
 
   return (
@@ -838,7 +838,7 @@ function PairAnalysisTab({ typeId }: { typeId: LotteryTypeId }) {
                 combos={combos}
                 savedKey={savedKey}
                 isPending={saveMutation.isPending}
-                onSave={(key, combo, lbl) => {
+                onSave={(_key, combo, lbl) => {
                   saveMutation.mutate(
                     { label: `Pares — ${lbl} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
                     { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
@@ -946,7 +946,7 @@ function BacktestTab({ typeId, defaultK }: { typeId: LotteryTypeId; defaultK: nu
   const [testDraws, setTestDraws] = useState<number>(100)
   const { data, isLoading } = useBacktest(typeId, defaultK, testDraws)
   const saveMutation = useSavePrediction()
-  const [savedKey, setSavedKey] = useState<string | null>(null)
+  const [savedKey] = useState<string | null>(null)
 
   const chartData = data
     ? Object.entries(data.matchDistribution)
@@ -979,7 +979,7 @@ function BacktestTab({ typeId, defaultK }: { typeId: LotteryTypeId; defaultK: nu
                 combos={combos}
                 savedKey={savedKey}
                 isPending={saveMutation.isPending}
-                onSave={(key, combo, lbl) => {
+                onSave={(_key, combo, lbl) => {
                   saveMutation.mutate(
                     { label: `Backtest — ${lbl} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
                     { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
@@ -1050,7 +1050,7 @@ function BayesianTab({ typeId }: { typeId: LotteryTypeId }) {
   const [window, setWindow] = useState<number>(50)
   const { data, isLoading } = useBayesianAnalysis(typeId, window)
   const saveMutation = useSavePrediction()
-  const [savedKey, setSavedKey] = useState<string | null>(null)
+  const [savedKey] = useState<string | null>(null)
   const meta = getLotteryMeta(typeId)
 
   const top15 = data?.slice(0, 15) ?? []
@@ -1097,7 +1097,7 @@ function BayesianTab({ typeId }: { typeId: LotteryTypeId }) {
                 combos={combos}
                 savedKey={savedKey}
                 isPending={saveMutation.isPending}
-                onSave={(key, combo, lbl) => {
+                onSave={(_key, combo, lbl) => {
                   saveMutation.mutate(
                     { label: `Bayesiano — ${lbl} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
                     { onSuccess: () => toast.success('Combinación guardada'), onError: () => toast.error('Error al guardar') },
@@ -1397,7 +1397,7 @@ function ScoreItem({ label, value, ok, detail }: { label: string; value: string;
 }
 
 function NumberPickerTab({
-  typeId, meta, dueNums, sumDist, balance, pairs, savePickerMutation, pickerSaved, setPickerSaved,
+  typeId, meta, dueNums, sumDist, balance, pairs, savePickerMutation, pickerSaved,
 }: {
   typeId: LotteryTypeId
   meta: { numbers: number; range: string; icon: string; label: string; color: string; id: LotteryTypeId }
@@ -1407,7 +1407,6 @@ function NumberPickerTab({
   pairs?: NumberPair[]
   savePickerMutation: ReturnType<typeof useSavePrediction>
   pickerSaved: boolean
-  setPickerSaved: (v: boolean) => void
 }) {
   const [selected, setSelected] = useState<Set<number>>(new Set())
   const maxNumbers = meta.numbers
@@ -1606,11 +1605,11 @@ export function GamePage() {
   const { data: calendarData, isLoading: loadingCal }  = useCalendarFrequency(typeId)
   const { data: pairs } = usePairAnalysis(typeId, 20)
   const saveDueMutation = useSavePrediction()
-  const [dueSaved, setDueSaved] = useState(false)
+  const [dueSaved] = useState(false)
   const saveGenMutation = useSavePrediction()
   const [genSavedKey, setGenSavedKey] = useState<string | null>(null)
   const savePickerMutation = useSavePrediction()
-  const [pickerSaved, setPickerSaved] = useState(false)
+  const [pickerSaved] = useState(false)
 
   function handleSave(key: string, combo: GeneratedCombo, label: string, prefix: string) {
     saveGenMutation.mutate(
@@ -2012,7 +2011,6 @@ export function GamePage() {
             pairs={pairs}
             savePickerMutation={savePickerMutation}
             pickerSaved={pickerSaved}
-            setPickerSaved={setPickerSaved}
           />
         </TabsContent>
 

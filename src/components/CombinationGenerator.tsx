@@ -185,7 +185,6 @@ export function CombinationGenerator() {
   const [excludeDrawn, setExcludeDrawn] = useState(true)
   const [results,      setResults]      = useState<GeneratedCombo[]>([])
   const [generated,    setGenerated]    = useState(false)
-  const [savedOk,      setSavedOk]      = useState(false)
 
   // ── Derived UI values ─────────────────────────────────────────────────────────
 

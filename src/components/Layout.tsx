@@ -87,7 +87,7 @@ function ProfilePopover({ onClose }: { onClose: () => void }) {
 }
 
 export function Layout() {
-  const { user, logout, isAdmin } = useAuth()
+  const { user, isAdmin } = useAuth()
   const [analysisOpen, setAnalysisOpen] = useState(true)
   const [profileOpen, setProfileOpen] = useState(false)
   const desktopProfileRef = useRef<HTMLDivElement>(null)
