@@ -42,7 +42,7 @@ export function Layout() {
         <nav className="flex flex-col gap-1 p-3 flex-1 overflow-y-auto">
 
           {/* Inicio */}
-          <NavLink to="/" end className={navLink}>
+          <NavLink to="/dashboard" end className={navLink}>
             <span className="text-lg">🏠</span>
             <span>Inicio</span>
           </NavLink>
@@ -125,7 +125,7 @@ export function Layout() {
       {/* ── Mobile bottom nav ── */}
       <nav className="fixed bottom-0 inset-x-0 z-50 flex items-stretch border-t border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-900 lg:hidden">
         <NavLink
-          to="/"
+          to="/dashboard"
           end
           className={({ isActive }) =>
             cn(
