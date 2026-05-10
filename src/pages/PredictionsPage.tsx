@@ -1096,26 +1096,48 @@ export function PredictionsPage() {
                   </div>
 
                   {r.drawsAnalyzed > 0 && r.comboDetails.length > 0 && (
-                    <div className="flex flex-col gap-2">
-                      <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500 dark:text-violet-400">Detalle por combinación</p>
+                    <div className="flex flex-col gap-3">
+                      <div>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500 dark:text-violet-400">
+                          Detalle por combinación
+                        </p>
+                        <p className="text-[10px] text-zinc-400 mt-0.5">
+                          El color de cada combinación indica su <strong>mejor acierto</strong> en los {r.drawsAnalyzed} sorteos analizados. Todos los números de la misma combinación comparten el mismo color.
+                        </p>
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 mt-1.5">
+                          {[
+                            { cls: 'bg-emerald-500', label: '4–6 aciertos (excelente)' },
+                            { cls: 'bg-amber-400',   label: '3 aciertos (bueno)' },
+                            { cls: 'bg-sky-400',     label: '2 aciertos (regular)' },
+                            { cls: 'bg-zinc-300 dark:bg-zinc-600', label: '0–1 aciertos' },
+                          ].map(({ cls, label }) => (
+                            <span key={label} className="inline-flex items-center gap-1 text-[10px] text-zinc-400">
+                              <span className={cn('w-2.5 h-2.5 rounded-full inline-block shrink-0', cls)} />
+                              {label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
                       {r.comboDetails.map((detail, ci) => {
                         const pct = r.bestMatchCount > 0 ? detail.bestMatchCount / 6 : 0
+                        const colorCls =
+                          detail.bestMatchCount >= 4 ? 'bg-emerald-500 text-white' :
+                          detail.bestMatchCount >= 3 ? 'bg-amber-400 text-white' :
+                          detail.bestMatchCount >= 2 ? 'bg-sky-400 text-white' :
+                          'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400'
                         return (
                           <div key={ci} className="flex items-center gap-3 flex-wrap">
-                            <div className="flex gap-1">
-                              {detail.comboNumbers.map(n => (
-                                <span
-                                  key={n}
-                                  className={cn(
-                                    'inline-flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold',
-                                    detail.bestMatchCount >= 4 ? 'bg-emerald-500 text-white' :
-                                    detail.bestMatchCount >= 3 ? 'bg-amber-400 text-white' :
-                                    detail.bestMatchCount >= 2 ? 'bg-sky-400 text-white' :
-                                    'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400',
-                                  )}
-                                >{n}</span>
-                              ))}
-                            </div>
+                            <Tip side="top" content={`Mejor: ${detail.bestMatchCount}/6 · Promedio: ${detail.averageMatchCount.toFixed(1)} aciertos por sorteo`}>
+                              <div className="flex gap-1 cursor-help">
+                                {detail.comboNumbers.map(n => (
+                                  <span
+                                    key={n}
+                                    className={cn('inline-flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold', colorCls)}
+                                  >{n}</span>
+                                ))}
+                              </div>
+                            </Tip>
                             <div className="flex-1 min-w-25">
                               <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
                                 <div
@@ -1126,8 +1148,8 @@ export function PredictionsPage() {
                                 />
                               </div>
                             </div>
-                            <span className="text-xs font-mono text-zinc-500 w-10 text-right">
-                              {detail.bestMatchCount}/6 · ø{detail.averageMatchCount.toFixed(1)}
+                            <span className="text-xs font-mono text-zinc-500 w-24 text-right whitespace-nowrap">
+                              mejor {detail.bestMatchCount}/6 · ø{detail.averageMatchCount.toFixed(1)}
                             </span>
                           </div>
                         )
