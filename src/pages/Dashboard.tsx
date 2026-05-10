@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import {
-  AreaChart, Area, ResponsiveContainer, Tooltip as RechartsTip,
+  AreaChart, Area, ReferenceLine, ResponsiveContainer, Tooltip as RechartsTip,
 } from 'recharts'
 import { LOTTERY_TYPES, formatNumber, formatDate } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
@@ -37,7 +37,7 @@ function StaleBadge({ days }: { days: number | null }) {
 
 // ── Sparkline ─────────────────────────────────────────────────────────────────
 
-function Sparkline({ draws, color }: { draws: DrawResult[]; color: string }) {
+function Sparkline({ draws, color, avg }: { draws: DrawResult[]; color: string; avg?: number }) {
   const data = [...draws]
     .slice(0, 20)
     .reverse()
@@ -70,6 +70,15 @@ function Sparkline({ draws, color }: { draws: DrawResult[]; color: string }) {
           dot={false}
           isAnimationActive={false}
         />
+        {avg != null && (
+          <ReferenceLine
+            y={avg}
+            stroke={color}
+            strokeDasharray="3 3"
+            strokeOpacity={0.6}
+            strokeWidth={1}
+          />
+        )}
       </AreaChart>
     </ResponsiveContainer>
   )
@@ -172,12 +181,25 @@ function GameCard({ id }: { id: LotteryTypeId }) {
               </div>
             </dl>
 
-            {draws && draws.length > 2 && (
-              <div>
-                <p className="mb-1 text-[11px] text-zinc-400">Suma últimos 20 sorteos</p>
-                <Sparkline draws={draws} color={meta.color} />
-              </div>
-            )}
+            {draws && draws.length > 2 && (() => {
+              const sums = draws.slice(0, 20).map(d => d.numbers.reduce((a, b) => a + b, 0))
+              const avg  = Math.round(sums.reduce((a, b) => a + b, 0) / sums.length)
+              const min  = Math.min(...sums)
+              const max  = Math.max(...sums)
+              return (
+                <div>
+                  <div className="flex items-baseline justify-between mb-1">
+                    <p className="text-[11px] text-zinc-400">Suma últimos 20 sorteos</p>
+                    <div className="flex items-center gap-2 text-[10px] text-zinc-400 tabular-nums">
+                      <span>mín <strong className="text-zinc-600 dark:text-zinc-300">{min}</strong></span>
+                      <span className="font-semibold text-violet-600 dark:text-violet-400">ø {avg}</span>
+                      <span>máx <strong className="text-zinc-600 dark:text-zinc-300">{max}</strong></span>
+                    </div>
+                  </div>
+                  <Sparkline draws={draws} color={meta.color} avg={avg} />
+                </div>
+              )
+            })()}
 
             <div>
               <p className="mb-1.5 text-[11px] text-zinc-400">Números más frecuentes</p>
