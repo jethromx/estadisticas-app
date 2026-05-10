@@ -925,24 +925,61 @@ export function PredictionsPage() {
                         }
 
                         {/* número pills */}
-                        <div className="flex gap-1.5 flex-wrap flex-1">
-                          {[...combo.numbers].sort((a, b) => a - b).map(n => (
-                            <span
-                              key={n}
-                              className={cn(
-                                'inline-flex h-9 w-9 items-center justify-center rounded-full font-bold text-sm shadow-sm',
-                                allNewDraws.length === 0
-                                  ? (n % 2 !== 0
-                                    ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
-                                    : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300')
-                                  : everMatched.has(n)
-                                  ? 'bg-emerald-500 text-white'
-                                  : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500',
-                              )}
-                            >
-                              {n}
-                            </span>
-                          ))}
+                        <div className="flex flex-col gap-1.5 flex-1">
+                          <div className="flex gap-1.5 flex-wrap">
+                            {[...combo.numbers].sort((a, b) => a - b).map(n => (
+                              <Tip
+                                key={n}
+                                side="top"
+                                content={
+                                  allNewDraws.length === 0
+                                    ? n % 2 !== 0 ? `${n} — número impar` : `${n} — número par`
+                                    : everMatched.has(n)
+                                      ? `${n} — coincidió en al menos un sorteo posterior`
+                                      : `${n} — no coincidió en ningún sorteo posterior`
+                                }
+                              >
+                                <span
+                                  className={cn(
+                                    'inline-flex h-9 w-9 items-center justify-center rounded-full font-bold text-sm shadow-sm cursor-help',
+                                    allNewDraws.length === 0
+                                      ? (n % 2 !== 0
+                                        ? 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300'
+                                        : 'bg-sky-100 dark:bg-sky-900/40 text-sky-700 dark:text-sky-300')
+                                      : everMatched.has(n)
+                                      ? 'bg-emerald-500 text-white'
+                                      : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-400 dark:text-zinc-500',
+                                  )}
+                                >
+                                  {n}
+                                </span>
+                              </Tip>
+                            ))}
+                          </div>
+                          {/* Leyenda contextual */}
+                          {allNewDraws.length === 0 ? (
+                            <div className="flex gap-3">
+                              <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400">
+                                <span className="w-2.5 h-2.5 rounded-full bg-violet-200 dark:bg-violet-700 inline-block" />
+                                Impar
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400">
+                                <span className="w-2.5 h-2.5 rounded-full bg-sky-200 dark:bg-sky-700 inline-block" />
+                                Par
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="flex gap-3">
+                              <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400">
+                                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block" />
+                                Coincidió en sorteo posterior
+                              </span>
+                              <span className="inline-flex items-center gap-1 text-[10px] text-zinc-400">
+                                <span className="w-2.5 h-2.5 rounded-full bg-zinc-300 dark:bg-zinc-600 inline-block" />
+                                No coincidió
+                              </span>
+                            </div>
+                          )}
                         </div>
 
                         {/* mejor acierto + promedio */}
