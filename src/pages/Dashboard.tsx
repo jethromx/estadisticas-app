@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { GameCardSkeleton, RecentPredictionSkeleton } from '@/components/ui/skeleton'
+import { NextDrawBanner } from '@/components/ui/next-draw-countdown'
 import type { LotteryTypeId, LotteryStatistics, DrawResult, SavedPredictionSet, DueNumber } from '@/types/lottery'
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -458,6 +459,8 @@ export function Dashboard() {
         </div>
         {isAdmin && <SyncAllButton />}
       </div>
+
+      <NextDrawBanner />
 
       <GlobalKPIs />
 

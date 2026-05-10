@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { ChevronDown } from 'lucide-react'
 import { useAuth } from '@/contexts/AuthContext'
 import { cn } from '@/lib/utils'
+import { NextDrawPill } from '@/components/ui/next-draw-countdown'
 
 // ── FAQ ───────────────────────────────────────────────────────────────────────
 
@@ -210,6 +211,10 @@ export function LandingPage() {
             >
               ¿Cómo funciona?
             </a>
+          </div>
+
+          <div className="mt-5">
+            <NextDrawPill />
           </div>
 
           {/* mini preview de combinaciones */}
