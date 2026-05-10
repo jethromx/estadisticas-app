@@ -444,6 +444,93 @@ function SyncAllButton() {
   )
 }
 
+// ── Último sorteo ─────────────────────────────────────────────────────────────
+
+function DrawBall({ n, highlight }: { n: number; highlight?: boolean }) {
+  return (
+    <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full font-bold text-sm tabular-nums shadow-sm
+      ${highlight
+        ? 'bg-violet-600 text-white ring-2 ring-violet-300 dark:ring-violet-700'
+        : 'bg-violet-100 dark:bg-violet-900/50 text-violet-800 dark:text-violet-200'
+      }`}>
+      {String(n).padStart(2, '0')}
+    </span>
+  )
+}
+
+function LastDrawResults() {
+  const types = LOTTERY_TYPES
+  const results = types.map(t => useDrawResults(t.id as LotteryTypeId, 1)) // eslint-disable-line react-hooks/rules-of-hooks
+  const isLoading = results.some(r => r.isLoading)
+  const hasAny = results.some(r => (r.data?.length ?? 0) > 0)
+
+  if (isLoading) return (
+    <div className="grid gap-3 sm:grid-cols-3">
+      {types.map(t => (
+        <div key={t.id} className="rounded-xl border border-zinc-200 dark:border-zinc-700 p-4 animate-pulse bg-zinc-50 dark:bg-zinc-800/50 h-28" />
+      ))}
+    </div>
+  )
+
+  if (!hasAny) return null
+
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs font-semibold uppercase tracking-wider text-zinc-400 dark:text-zinc-500">
+        Resultado del último sorteo
+      </p>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {types.map((meta, i) => {
+          const draw = results[i].data?.[0]
+          if (!draw) return null
+          const fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 })
+          return (
+            <div key={meta.id} className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-lg">{meta.icon}</span>
+                  <span className="text-sm font-bold text-zinc-800 dark:text-zinc-100">{meta.label}</span>
+                </div>
+                <div className="text-right">
+                  <p className="text-[10px] text-zinc-400">Sorteo #{draw.drawNumber}</p>
+                  <p className="text-[10px] text-zinc-400">{new Date(draw.drawDate).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                </div>
+              </div>
+
+              <div className="flex gap-1.5 flex-wrap">
+                {[...draw.numbers].sort((a, b) => a - b).map(n => (
+                  <DrawBall key={n} n={n} />
+                ))}
+              </div>
+
+              {(draw.jackpotAmount != null || draw.firstPrizeWinners != null) && (
+                <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 pt-2">
+                  {draw.jackpotAmount != null && (
+                    <div>
+                      <p className="text-[10px] text-zinc-400">Bolsa</p>
+                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                        {fmt.format(draw.jackpotAmount)}
+                      </p>
+                    </div>
+                  )}
+                  {draw.firstPrizeWinners != null && (
+                    <div className="text-right">
+                      <p className="text-[10px] text-zinc-400">Ganadores</p>
+                      <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300">
+                        {draw.firstPrizeWinners === 0 ? 'Ninguno' : draw.firstPrizeWinners}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export function Dashboard() {
@@ -461,6 +548,8 @@ export function Dashboard() {
       </div>
 
       <NextDrawBanner />
+
+      <LastDrawResults />
 
       <GlobalKPIs />
 

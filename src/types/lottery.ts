@@ -152,9 +152,11 @@ export interface NeuralPrediction {
 }
 
 export interface DrawResult {
-  drawNumber: number
-  drawDate:   string
-  numbers:    number[]
+  drawNumber:        number
+  drawDate:          string
+  numbers:           number[]
+  jackpotAmount?:    number | null
+  firstPrizeWinners?: number | null
 }
 
 export interface SyncResult {
