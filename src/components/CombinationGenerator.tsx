@@ -418,7 +418,7 @@ export function CombinationGenerator() {
                   <button onClick={() => setNumCombos(v => Math.max(1, v - 1))}
                     className="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold flex items-center justify-center">−</button>
                   <span className="w-8 text-center font-bold text-zinc-800 dark:text-zinc-200 tabular-nums text-sm">{numCombos}</span>
-                  <button onClick={() => setNumCombos(v => Math.min(10, v + 1))}
+                  <button onClick={() => setNumCombos(v => Math.min(30, v + 1))}
                     className="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold flex items-center justify-center">+</button>
                 </div>
               </div>
