@@ -245,6 +245,23 @@ export function CombinationGenerator() {
     })
   }, [rankedScores, bayesMap, dueMap, backtestMap, pairsMap, arimaForecasts]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Lookup: number → per-analysis normalized score
+  const baseScoreByNum = useMemo(() => {
+    const map: Record<number, Record<keyof GenWeights, number>> = {}
+    for (const s of baseScores) {
+      map[s.n] = { due: s.due, bayes: s.bayes, arima: s.arima, backtest: s.backtest, pairs: s.pairs, consensus: s.consensus }
+    }
+    return map
+  }, [baseScores])
+
+  // Which analysis contributed most to this number's selection (weighted)
+  function dominantSignal(n: number): keyof GenWeights {
+    const s = baseScoreByNum[n]
+    if (!s) return 'consensus'
+    const keys = Object.keys(weights) as (keyof GenWeights)[]
+    return keys.reduce((best, k) => s[k] * weights[k] > s[best] * weights[best] ? k : best)
+  }
+
   // ── Actions ──────────────────────────────────────────────────────────────────
 
   function saveCurrentResults() {
@@ -559,13 +576,20 @@ export function CombinationGenerator() {
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="text-xs font-bold text-zinc-400 dark:text-zinc-500 w-5 shrink-0">#{idx + 1}</span>
                       <div className="flex flex-wrap gap-1.5 flex-1">
-                        {[...combo.numbers].sort((a, b) => a - b).map(n => (
-                          <span key={n}
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-base text-white shadow-sm"
-                            style={{ background: n % 2 !== 0 ? '#7c3aed' : '#0ea5e9' }}>
-                            {n}
-                          </span>
-                        ))}
+                        {[...combo.numbers].sort((a, b) => a - b).map(n => {
+                          const sig = dominantSignal(n)
+                          const score = baseScoreByNum[n]?.[sig] ?? 0
+                          return (
+                            <Tip key={n} content={`${n} — señal dominante: ${WEIGHT_LABELS[sig]} (${Math.round(score * 100)}%)`} side="top">
+                              <span
+                                className="inline-flex h-10 w-10 items-center justify-center rounded-full font-bold text-base text-white shadow-md cursor-help ring-2 ring-white/40 select-none transition-transform hover:scale-110"
+                                style={{ background: `linear-gradient(135deg, ${WEIGHT_COLORS[sig]}, ${WEIGHT_COLORS[sig]}cc)` }}
+                              >
+                                {n}
+                              </span>
+                            </Tip>
+                          )
+                        })}
                       </div>
                       <div className="flex flex-col items-end gap-1 shrink-0">
                         {combo.scores.consensus > 0 && (
@@ -597,6 +621,21 @@ export function CombinationGenerator() {
                         </button>
                       </div>
                     </div>
+
+                    {/* Color legend — only signals present in this combo */}
+                    {(() => {
+                      const signals = [...new Set([...combo.numbers].map(n => dominantSignal(n)))]
+                      return (
+                        <div className="flex flex-wrap gap-x-3 gap-y-1 px-1">
+                          {signals.map(sig => (
+                            <span key={sig} className="inline-flex items-center gap-1 text-[10px] text-zinc-500 dark:text-zinc-400">
+                              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: WEIGHT_COLORS[sig] }} />
+                              {WEIGHT_LABELS[sig]}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                    })()}
 
                     {/* Σ range bar */}
                     <div className="flex flex-col gap-0.5">
