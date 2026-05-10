@@ -87,29 +87,48 @@ const COMBO_COLORS = ['#7c3aed', '#0ea5e9', '#10b981', '#f59e0b', '#ef4444']
 
 // ── historial de aciertos: dots coloreados por sorteo ────────────────────────
 function MatchHistoryDots({ combo, draws }: { combo: GeneratedCombo; draws: DrawResult[] }) {
-  const recent = draws.slice(-15).reverse()   // los 15 más recientes, orden asc
+  const recent = draws.slice(-15).reverse()
   if (!recent.length) return null
   return (
-    <div className="flex items-center gap-0.5 pl-8">
-      {recent.map((draw, i) => {
-        const count = combo.numbers.filter(n => draw.numbers.includes(n)).length
-        return (
-          <span
-            key={i}
-            title={`${draw.drawDate}: ${count}/6 aciertos`}
-            className={cn(
-              'inline-block h-3 w-3 rounded-sm cursor-help',
-              count >= 5 ? 'bg-emerald-500' :
-              count === 4 ? 'bg-emerald-300 dark:bg-emerald-700' :
-              count === 3 ? 'bg-amber-400' :
-              count === 2 ? 'bg-sky-400' :
-              count === 1 ? 'bg-sky-200 dark:bg-sky-900' :
-              'bg-zinc-100 dark:bg-zinc-800',
-            )}
-          />
-        )
-      })}
-      <span className="text-[9px] text-zinc-400 ml-1">← {recent.length}s</span>
+    <div className="flex flex-col gap-1 pl-8">
+      <p className="text-[10px] text-zinc-400 font-medium">
+        Historial de aciertos — últimos {recent.length} sorteos (más reciente →)
+      </p>
+      <div className="flex items-center gap-0.5">
+        {recent.map((draw, i) => {
+          const count = combo.numbers.filter(n => draw.numbers.includes(n)).length
+          return (
+            <Tip key={i} side="top" content={`${draw.drawDate}: ${count} de 6 aciertos`}>
+              <span
+                className={cn(
+                  'inline-block h-3.5 w-3.5 rounded-sm cursor-help',
+                  count >= 5 ? 'bg-emerald-500' :
+                  count === 4 ? 'bg-emerald-300 dark:bg-emerald-700' :
+                  count === 3 ? 'bg-amber-400' :
+                  count === 2 ? 'bg-sky-400' :
+                  count === 1 ? 'bg-sky-200 dark:bg-sky-900' :
+                  'bg-zinc-100 dark:bg-zinc-800',
+                )}
+              />
+            </Tip>
+          )
+        })}
+      </div>
+      <div className="flex flex-wrap gap-x-3 gap-y-0.5">
+        {[
+          { color: 'bg-emerald-500',                          label: '5–6 aciertos' },
+          { color: 'bg-emerald-300 dark:bg-emerald-700',      label: '4 aciertos' },
+          { color: 'bg-amber-400',                            label: '3 aciertos' },
+          { color: 'bg-sky-400',                              label: '2 aciertos' },
+          { color: 'bg-sky-200 dark:bg-sky-900',              label: '1 acierto' },
+          { color: 'bg-zinc-100 dark:bg-zinc-800',            label: '0 aciertos' },
+        ].map(({ color, label }) => (
+          <span key={label} className="inline-flex items-center gap-1 text-[9px] text-zinc-400">
+            <span className={cn('w-2.5 h-2.5 rounded-sm inline-block shrink-0', color)} />
+            {label}
+          </span>
+        ))}
+      </div>
     </div>
   )
 }
