@@ -127,7 +127,7 @@ function ComboCardSkeleton() {
 }
 
 function buildEntriesForType(
-  type: LotteryTypeId,
+  _type: LotteryTypeId,
   suggestions: ReturnType<typeof useSuggestions>['data'],
   dueNumbers: DueNumber[] | undefined,
   bayesian: BayesianNumber[] | undefined,
