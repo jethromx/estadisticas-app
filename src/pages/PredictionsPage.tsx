@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
+import { ChevronDown, ChevronUp, Zap, Share2, Star, Trash2, RotateCcw } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   LineChart, Line, XAxis, YAxis,
@@ -780,85 +781,116 @@ export function PredictionsPage() {
                   }}
                 >
           <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-900">
-            {/* Set header */}
-            <div className="flex items-center justify-between px-4 py-3 bg-zinc-50 dark:bg-zinc-800/50">
-              <button
-                className="flex-1 flex items-center gap-3 text-left"
-                onClick={() => setExpandedSetId(isExpanded ? null : set.id)}
-              >
-                <span className="text-sm font-semibold text-zinc-800 dark:text-zinc-200">{set.label}</span>
-                <span className="text-[10px] text-zinc-400">
+
+            {/* ── Info row: label + date + badges ── */}
+            <div className="flex items-start gap-3 px-4 pt-3 pb-2">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate">{set.label}</p>
+                <p className="text-[11px] text-zinc-400 mt-0.5">
                   {new Date(set.savedAt).toLocaleString('es-MX', {
                     day: '2-digit', month: 'short', year: 'numeric',
                     hour: '2-digit', minute: '2-digit',
                   })}
-                </span>
-                {allNewDraws.length > 0 ? (
-                  <span className="text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full">
-                    {allNewDraws.length} sorteo{allNewDraws.length !== 1 ? 's' : ''} nuevo{allNewDraws.length !== 1 ? 's' : ''}
-                  </span>
-                ) : (
-                  <span className="text-[10px] text-zinc-400">sin sorteos nuevos aún</span>
-                )}
-                <span className="ml-auto text-zinc-400 text-xs">{isExpanded ? '▲' : '▼'}</span>
-              </button>
-              <button
-                onClick={() => analyzeSet(set.id)}
-                disabled={analyzingId === set.id}
-                className="ml-3 rounded-lg border border-violet-200 dark:border-violet-800 px-2.5 py-1 text-[11px] font-medium text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/30 disabled:opacity-50 transition-colors"
-                title="Analizar precisión vs sorteos posteriores"
-              >
-                {analyzingId === set.id ? '…' : analysisResults[set.id] ? '↺ Re-analizar' : '⚡ Analizar'}
-              </button>
-              <button
-                onClick={async () => {
-                  const blob = await generateShareImage(set)
-                  const text = `🎰 ${set.label}\n${set.combos.slice(0, 3).map(c => c.numbers.join(' · ')).join('\n')}`
-                  if (navigator.share && navigator.canShare?.({ files: [new File([blob], 'combo.png', { type: 'image/png' })] })) {
-                    await navigator.share({
-                      title: set.label,
-                      text,
-                      files: [new File([blob], 'combo.png', { type: 'image/png' })],
-                    })
-                  } else {
-                    // fallback: download image + open WhatsApp
-                    const url = URL.createObjectURL(blob)
-                    const a = document.createElement('a')
-                    a.href = url; a.download = `${set.label}.png`; a.click()
-                    URL.revokeObjectURL(url)
-                    const wa = `https://wa.me/?text=${encodeURIComponent(text)}`
-                    window.open(wa, '_blank')
-                  }
-                }}
-                title="Compartir combinación"
-                className="text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors p-1"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                  <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                </svg>
-              </button>
-              <button
-                onClick={() => toggleFavoriteMutation.mutate(set.id)}
-                disabled={toggleFavoriteMutation.isPending}
-                className={cn(
-                  'ml-1 transition-colors text-base',
-                  set.favorite
-                    ? 'text-amber-400 hover:text-amber-500'
-                    : 'text-zinc-300 dark:text-zinc-600 hover:text-amber-400',
-                )}
-                title={set.favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}
-              >
-                {set.favorite ? '⭐' : '☆'}
-              </button>
-              <button
-                onClick={() => deleteSet(set.id)}
-                className="ml-1 text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 transition-colors text-base"
-                title="Eliminar predicción"
-              >
-                🗑
-              </button>
+                  {set.lotteryType && (
+                    <span className="ml-1.5 font-medium text-violet-500">{set.lotteryType}</span>
+                  )}
+                </p>
+              </div>
+
+              {/* Action buttons — clearly separated from expand */}
+              <div className="flex items-center gap-0.5 shrink-0">
+                <Tip content={analysisResults[set.id] ? 'Re-analizar vs sorteos' : 'Analizar precisión vs sorteos posteriores'}>
+                  <button
+                    onClick={() => analyzeSet(set.id)}
+                    disabled={analyzingId === set.id}
+                    className={cn(
+                      'flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-40',
+                      analysisResults[set.id]
+                        ? 'text-violet-500 hover:bg-violet-50 dark:hover:bg-violet-900/30'
+                        : 'bg-violet-100 dark:bg-violet-900/40 text-violet-700 dark:text-violet-300 hover:bg-violet-200 dark:hover:bg-violet-900/60',
+                    )}
+                  >
+                    {analyzingId === set.id
+                      ? <span className="animate-spin text-xs">⏳</span>
+                      : analysisResults[set.id]
+                        ? <RotateCcw className="h-3 w-3" />
+                        : <Zap className="h-3 w-3" />
+                    }
+                    {analysisResults[set.id] ? 'Re-analizar' : 'Analizar'}
+                  </button>
+                </Tip>
+
+                <div className="w-px h-5 bg-zinc-200 dark:bg-zinc-700 mx-1" />
+
+                <Tip content="Compartir combinación">
+                  <button
+                    onClick={async () => {
+                      const blob = await generateShareImage(set)
+                      const text = `🎰 ${set.label}\n${set.combos.slice(0, 3).map(c => c.numbers.join(' · ')).join('\n')}`
+                      if (navigator.share && navigator.canShare?.({ files: [new File([blob], 'combo.png', { type: 'image/png' })] })) {
+                        await navigator.share({ title: set.label, text, files: [new File([blob], 'combo.png', { type: 'image/png' })] })
+                      } else {
+                        const url = URL.createObjectURL(blob)
+                        const a = document.createElement('a')
+                        a.href = url; a.download = `${set.label}.png`; a.click()
+                        URL.revokeObjectURL(url)
+                        window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
+                      }
+                    }}
+                    className="p-1.5 rounded-lg text-zinc-400 hover:text-violet-600 dark:hover:text-violet-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
+                  >
+                    <Share2 className="h-3.5 w-3.5" />
+                  </button>
+                </Tip>
+
+                <Tip content={set.favorite ? 'Quitar de favoritos' : 'Marcar como favorito'}>
+                  <button
+                    onClick={() => toggleFavoriteMutation.mutate(set.id)}
+                    disabled={toggleFavoriteMutation.isPending}
+                    className={cn(
+                      'p-1.5 rounded-lg transition-colors disabled:opacity-40',
+                      set.favorite
+                        ? 'text-amber-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                        : 'text-zinc-300 dark:text-zinc-600 hover:text-amber-400 hover:bg-zinc-100 dark:hover:bg-zinc-800',
+                    )}
+                  >
+                    <Star className={cn('h-3.5 w-3.5', set.favorite && 'fill-amber-400')} />
+                  </button>
+                </Tip>
+
+                <Tip content="Eliminar predicción">
+                  <button
+                    onClick={() => deleteSet(set.id)}
+                    className="p-1.5 rounded-lg text-zinc-300 dark:text-zinc-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </Tip>
+              </div>
             </div>
+
+            {/* ── Expand/collapse row — clearly labelled ── */}
+            <button
+              className={cn(
+                'w-full flex items-center gap-2 px-4 py-2 border-t text-left transition-colors',
+                isExpanded
+                  ? 'border-violet-200 dark:border-violet-800 bg-violet-50/60 dark:bg-violet-900/20'
+                  : 'border-zinc-100 dark:border-zinc-800 hover:bg-zinc-50 dark:hover:bg-zinc-800/50',
+              )}
+              onClick={() => setExpandedSetId(isExpanded ? null : set.id)}
+            >
+              {allNewDraws.length > 0 ? (
+                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
+                  {allNewDraws.length} sorteo{allNewDraws.length !== 1 ? 's' : ''} nuevo{allNewDraws.length !== 1 ? 's' : ''}
+                </span>
+              ) : (
+                <span className="text-[10px] text-zinc-400">sin sorteos nuevos</span>
+              )}
+              <span className="ml-auto flex items-center gap-1 text-[11px] font-medium text-violet-600 dark:text-violet-400">
+                {isExpanded ? 'Ocultar combinaciones' : 'Ver combinaciones'}
+                {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+              </span>
+            </button>
 
             {/* Combos */}
             {isExpanded && (
