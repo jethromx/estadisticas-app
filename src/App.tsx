@@ -14,6 +14,7 @@ import { LoginPage } from '@/pages/LoginPage'
 import { AdminDashboard } from '@/pages/admin/AdminDashboard'
 import { LandingPage } from '@/pages/LandingPage'
 import { HelpPage } from '@/pages/HelpPage'
+import { TopCombosPage } from '@/pages/TopCombosPage'
 
 const queryClient = new QueryClient()
 
@@ -34,6 +35,7 @@ export default function App() {
                 <Route path="comparative" element={<ComparativePage />} />
                 <Route path="predicciones" element={<PredictionsPage />} />
                 <Route path="ayuda" element={<HelpPage />} />
+                <Route path="mejores" element={<TopCombosPage />} />
                 <Route element={<AdminRoute />}>
                   <Route path="admin" element={<AdminDashboard />} />
                 </Route>
