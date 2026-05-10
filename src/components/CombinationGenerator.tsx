@@ -417,10 +417,17 @@ export function CombinationGenerator() {
                 <div className="flex items-center gap-1">
                   <button onClick={() => setNumCombos(v => Math.max(1, v - 1))}
                     className="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold flex items-center justify-center">−</button>
-                  <span className="w-8 text-center font-bold text-zinc-800 dark:text-zinc-200 tabular-nums text-sm">{numCombos}</span>
+                  <span className={cn(
+                    'w-8 text-center font-bold tabular-nums text-sm',
+                    numCombos === 30 ? 'text-red-600 dark:text-red-400' : 'text-zinc-800 dark:text-zinc-200',
+                  )}>{numCombos}</span>
                   <button onClick={() => setNumCombos(v => Math.min(30, v + 1))}
-                    className="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold flex items-center justify-center">+</button>
+                    disabled={numCombos === 30}
+                    className="w-7 h-7 rounded-md border border-zinc-200 dark:border-zinc-700 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 font-bold flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed">+</button>
                 </div>
+                {numCombos === 30 && (
+                  <p className="text-[10px] text-red-500 dark:text-red-400 font-medium">Límite máximo alcanzado</p>
+                )}
               </div>
 
               {/* Balance */}
