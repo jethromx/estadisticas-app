@@ -789,6 +789,7 @@ const PAIR_LIMIT_OPTIONS = [20, 50, 100] as const
 function PairAnalysisTab({ typeId }: { typeId: LotteryTypeId }) {
   const [limit, setLimit] = useState<number>(20)
   const { data, isLoading } = usePairAnalysis(typeId, limit)
+  const { data: sumDist } = useSumDistribution(typeId)
   const saveMutation = useSavePrediction()
   const [savedKey] = useState<string | null>(null)
   const meta = getLotteryMeta(typeId)
@@ -839,6 +840,7 @@ function PairAnalysisTab({ typeId }: { typeId: LotteryTypeId }) {
                 combos={combos}
                 savedKey={savedKey}
                 isPending={saveMutation.isPending}
+                sumDist={sumDist ?? undefined}
                 onSave={(_key, combo, lbl) => {
                   saveMutation.mutate(
                     { label: `Pares — ${lbl} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
@@ -946,6 +948,7 @@ const TEST_DRAWS_OPTIONS = [50, 100, 200, 500] as const
 function BacktestTab({ typeId, defaultK }: { typeId: LotteryTypeId; defaultK: number }) {
   const [testDraws, setTestDraws] = useState<number>(100)
   const { data, isLoading } = useBacktest(typeId, defaultK, testDraws)
+  const { data: sumDist } = useSumDistribution(typeId)
   const saveMutation = useSavePrediction()
   const [savedKey] = useState<string | null>(null)
 
@@ -980,6 +983,7 @@ function BacktestTab({ typeId, defaultK }: { typeId: LotteryTypeId; defaultK: nu
                 combos={combos}
                 savedKey={savedKey}
                 isPending={saveMutation.isPending}
+                sumDist={sumDist ?? undefined}
                 onSave={(_key, combo, lbl) => {
                   saveMutation.mutate(
                     { label: `Backtest — ${lbl} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
@@ -1050,6 +1054,7 @@ const BAYES_WINDOW_OPTIONS = [20, 50, 100, 200] as const
 function BayesianTab({ typeId }: { typeId: LotteryTypeId }) {
   const [window, setWindow] = useState<number>(50)
   const { data, isLoading } = useBayesianAnalysis(typeId, window)
+  const { data: sumDist } = useSumDistribution(typeId)
   const saveMutation = useSavePrediction()
   const [savedKey] = useState<string | null>(null)
   const meta = getLotteryMeta(typeId)
@@ -1098,6 +1103,7 @@ function BayesianTab({ typeId }: { typeId: LotteryTypeId }) {
                 combos={combos}
                 savedKey={savedKey}
                 isPending={saveMutation.isPending}
+                sumDist={sumDist ?? undefined}
                 onSave={(_key, combo, lbl) => {
                   saveMutation.mutate(
                     { label: `Bayesiano — ${lbl} (${typeId})`, latestDrawDate: null, combos: [combo], lotteryType: typeId },
@@ -1724,6 +1730,7 @@ export function GamePage() {
                 }]}
                 savedKey={dueSaved ? 'due' : null}
                 isPending={saveDueMutation.isPending}
+                sumDist={sumDist ?? undefined}
                 onSave={(_key, combo, label) => {
                   saveDueMutation.mutate(
                     { label: `${label} (${typeId})`, latestDrawDate: null, lotteryType: typeId, combos: [combo] },
@@ -1823,6 +1830,7 @@ export function GamePage() {
                     combos={combos}
                     savedKey={genSavedKey}
                     isPending={saveGenMutation.isPending}
+                    sumDist={sumDist ?? undefined}
                     onSave={(key, combo, label) => handleSave(key, combo, label, 'Histórico')}
                   />
                 )
@@ -1891,6 +1899,7 @@ export function GamePage() {
                     combos={combos}
                     savedKey={genSavedKey}
                     isPending={saveGenMutation.isPending}
+                    sumDist={sumDist ?? undefined}
                     onSave={(key, combo, label) => handleSave(key, combo, label, 'Frecuencias')}
                   />
                 )
@@ -1965,6 +1974,7 @@ export function GamePage() {
                   combos={combos}
                   savedKey={genSavedKey}
                   isPending={saveGenMutation.isPending}
+                    sumDist={sumDist ?? undefined}
                   onSave={(key, combo, label) => handleSave(key, combo, label, 'Cal/Fríos')}
                 />
               )

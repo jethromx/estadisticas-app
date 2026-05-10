@@ -1,7 +1,8 @@
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tooltip as Tip } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import type { GeneratedCombo } from '@/types/lottery'
+import type { GeneratedCombo, SumDistribution } from '@/types/lottery'
 
 function confidencePct(scores: GeneratedCombo['scores']): number | null {
   const raw = scores.consensus
@@ -48,18 +49,51 @@ export function buildCombo(numbers: number[]): GeneratedCombo {
   }
 }
 
+function SumBar({ sum, dist }: { sum: number; dist: SumDistribution }) {
+  const range = dist.maxSum - dist.minSum || 1
+  const pctSum     = Math.max(0, Math.min(100, ((sum            - dist.minSum) / range) * 100))
+  const pctOptL    = Math.max(0, Math.min(100, ((dist.optimalMin - dist.minSum) / range) * 100))
+  const pctOptW    = Math.max(0, Math.min(100 - pctOptL, ((dist.optimalMax - dist.optimalMin) / range) * 100))
+  const sigma      = dist.stdDev > 0 ? (sum - dist.mean) / dist.stdDev : 0
+  const inRange    = sum >= dist.optimalMin && sum <= dist.optimalMax
+  const sigmaLabel = Math.abs(sigma) < 0.1 ? 'en la media' : `${sigma > 0 ? '+' : ''}${sigma.toFixed(1)}σ`
+
+  return (
+    <Tip content={`Suma ${sum} · ${sigmaLabel} · Rango óptimo ${dist.optimalMin}–${dist.optimalMax} · Media ${dist.mean.toFixed(0)}`}>
+      <div className="flex flex-col gap-0.5 w-full cursor-help">
+        <div className="relative h-2 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+          <div className="absolute top-0 h-full rounded-full bg-emerald-200 dark:bg-emerald-900/50"
+               style={{ left: `${pctOptL}%`, width: `${pctOptW}%` }} />
+          <div className={cn('absolute top-0 h-full w-1.5 rounded-full -translate-x-1/2',
+                             inRange ? 'bg-emerald-600' : 'bg-amber-500')}
+               style={{ left: `${pctSum}%` }} />
+        </div>
+        <div className="flex justify-between text-[9px] tabular-nums">
+          <span className="text-zinc-400">Σ {sum}</span>
+          <span className={cn('font-semibold', inRange ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-500')}>
+            {inRange ? '✓ En rango óptimo' : sigmaLabel + ' de la media'}
+          </span>
+          <span className="text-zinc-400">ó {dist.optimalMin}–{dist.optimalMax}</span>
+        </div>
+      </div>
+    </Tip>
+  )
+}
+
 export function SuggestedCombosCard({
   subtitle,
   combos,
   savedKey,
   isPending,
   onSave,
+  sumDist,
 }: {
   subtitle?: string
   combos: SuggestedCombo[]
   savedKey: string | null
   isPending: boolean
   onSave: (key: string, combo: GeneratedCombo, label: string) => void
+  sumDist?: SumDistribution
 }) {
   return (
     <Card className="border-2 border-violet-200 dark:border-violet-800 bg-violet-50/30 dark:bg-violet-900/10">
@@ -85,21 +119,25 @@ export function SuggestedCombosCard({
                   }
                 </div>
               </div>
-              <div className="flex flex-wrap gap-4">
-                {[...combo.numbers].sort((a, b) => a - b).map(n => (
-                  <div key={n} className="flex flex-col items-center gap-1.5">
+              <div className="flex flex-col gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
+                  {[...combo.numbers].sort((a, b) => a - b).map(n => (
                     <span
+                      key={n}
                       className="inline-flex h-11 w-11 items-center justify-center rounded-full font-bold text-base text-white shadow-sm"
                       style={{ background: color }}
                     >
                       {n}
                     </span>
+                  ))}
+                  <div className="flex flex-col justify-center items-end gap-1 ml-auto shrink-0">
+                    {!sumDist && (
+                      <span className="text-sm font-bold tabular-nums text-zinc-700 dark:text-zinc-300">Σ {combo.sum}</span>
+                    )}
+                    <ConfidenceBadge scores={combo.scores} />
                   </div>
-                ))}
-                <div className="flex flex-col justify-center items-end gap-1 ml-auto">
-                  <span className="text-sm font-bold tabular-nums text-zinc-700 dark:text-zinc-300">Σ {combo.sum}</span>
-                  <ConfidenceBadge scores={combo.scores} />
                 </div>
+                {sumDist && <SumBar sum={combo.sum} dist={sumDist} />}
               </div>
             </div>
           ))}
