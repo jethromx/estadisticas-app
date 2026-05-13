@@ -1,7 +1,7 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Bookmark, Loader2 } from 'lucide-react'
+import { ArrowLeft, Bookmark, Check, Copy, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
@@ -384,6 +384,187 @@ function TopCombosAllTypes() {
   )
 }
 
+// ── AllCombosSnapshot ─────────────────────────────────────────────────────────
+
+function useGameEntries(type: LotteryTypeId) {
+  const { data: suggestions } = useSuggestions(type)
+  const { data: dueNumbers }  = useDueNumbers(type, 20)
+  const { data: bayesian }    = useBayesianAnalysis(type)
+  const { data: windowed }    = useWindowedFrequencies(type, 100)
+  const { data: backtest }    = useBacktest(type, NUMBERS_PER_DRAW)
+  const { data: sumDist }     = useSumDistribution(type)
+  return useMemo(
+    () => ({ entries: buildEntriesForType(type, suggestions, dueNumbers, bayesian, windowed, backtest), sumDist }),
+    [type, suggestions, dueNumbers, bayesian, windowed, backtest, sumDist],
+  )
+}
+
+function SnapshotRow({ entry, sumDist, color }: { entry: ComboEntry; sumDist?: SumDistribution; color: string }) {
+  const sorted = [...entry.numbers].sort((a, b) => a - b)
+  const sum = sorted.reduce((a, b) => a + b, 0)
+  const inRange = sumDist ? sum >= sumDist.optimalMin && sum <= sumDist.optimalMax : null
+
+  return (
+    <div className="flex items-center gap-3 py-1.5 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
+      <span
+        className="w-28 shrink-0 text-[11px] font-semibold truncate"
+        style={{ color }}
+      >
+        {entry.source}
+      </span>
+      <div className="flex gap-1 flex-1">
+        {sorted.map(n => (
+          <span
+            key={n}
+            className="inline-flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold text-white tabular-nums"
+            style={{ background: color }}
+          >
+            {String(n).padStart(2, '0')}
+          </span>
+        ))}
+      </div>
+      <span className={cn(
+        'text-[10px] tabular-nums font-semibold shrink-0',
+        inRange === true  ? 'text-emerald-600 dark:text-emerald-400' :
+        inRange === false ? 'text-amber-500' :
+        'text-zinc-400',
+      )}>
+        Σ {sum}
+        {inRange === true && ' ✓'}
+      </span>
+    </div>
+  )
+}
+
+function AllCombosSnapshot() {
+  const [copied, setCopied] = useState(false)
+  const saveMutation = useSavePrediction()
+
+  const melate      = useGameEntries('MELATE')
+  const revancha    = useGameEntries('REVANCHA')
+  const revanchita  = useGameEntries('REVANCHITA')
+
+  const groups = [
+    { type: 'MELATE'     as LotteryTypeId, ...melate },
+    { type: 'REVANCHA'   as LotteryTypeId, ...revancha },
+    { type: 'REVANCHITA' as LotteryTypeId, ...revanchita },
+  ]
+
+  function buildText() {
+    return groups.map(({ type, entries }) => {
+      const meta = LOTTERY_TYPES.find(l => l.id === type)!
+      const lines = entries.map(e => {
+        const sorted = [...e.numbers].sort((a, b) => a - b)
+        const nums = sorted.map(n => String(n).padStart(2, '0')).join('-')
+        const sum  = sorted.reduce((a, b) => a + b, 0)
+        return `${e.source.padEnd(16)}: ${nums}  (Σ ${sum})`
+      }).join('\n')
+      return `=== ${meta.label.toUpperCase()} ===\n${lines}`
+    }).join('\n\n')
+  }
+
+  function handleCopy() {
+    navigator.clipboard.writeText(buildText()).then(() => {
+      setCopied(true)
+      toast.success('Combinaciones copiadas al portapapeles')
+      setTimeout(() => setCopied(false), 2000)
+    })
+  }
+
+  function handleSaveAll() {
+    let queued = 0
+    for (const { type, entries } of groups) {
+      const meta = LOTTERY_TYPES.find(l => l.id === type)!
+      for (const entry of entries) {
+        const sorted = [...entry.numbers].sort((a, b) => a - b)
+        saveMutation.mutate(
+          {
+            label: `${meta.label} — ${entry.source}`,
+            lotteryType: type,
+            latestDrawDate: null,
+            combos: [buildCombo(sorted)],
+          },
+          { onError: (err) => toast.error(`Error al guardar: ${err.message}`) },
+        )
+        queued++
+      }
+    }
+    toast.success(`Guardando ${queued} combinaciones…`)
+  }
+
+  const totalEntries = groups.reduce((a, g) => a + g.entries.length, 0)
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <div className="flex items-start justify-between gap-3 flex-wrap">
+          <div>
+            <CardTitle className="text-base">Vista rápida — todas las combinaciones</CardTitle>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+              {totalEntries} combinaciones · 3 juegos · 5 métodos de análisis
+            </p>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <Button size="sm" variant="outline" onClick={handleCopy} className="gap-1.5">
+              {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+              {copied ? 'Copiado' : 'Copiar texto'}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5"
+              disabled={saveMutation.isPending || totalEntries === 0}
+              onClick={handleSaveAll}
+            >
+              {saveMutation.isPending
+                ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                : <Bookmark className="h-3.5 w-3.5" />}
+              Guardar todas
+            </Button>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-5">
+        {groups.map(({ type, entries, sumDist }) => {
+          const meta = LOTTERY_TYPES.find(l => l.id === type)!
+          if (entries.length === 0) return null
+          return (
+            <div key={type}>
+              <div className="flex items-center gap-2 mb-2">
+                <span
+                  className="flex h-7 w-7 items-center justify-center rounded-lg text-base"
+                  style={{ background: meta.color + '20' }}
+                >
+                  {meta.icon}
+                </span>
+                <span className="text-sm font-bold" style={{ color: meta.color }}>{meta.label}</span>
+                {sumDist && (
+                  <span className="text-[10px] text-zinc-400 ml-auto">
+                    rango óptimo Σ {sumDist.optimalMin}–{sumDist.optimalMax}
+                  </span>
+                )}
+              </div>
+              <div className="rounded-lg border border-zinc-100 dark:border-zinc-800 px-3">
+                {entries.map(entry => (
+                  <SnapshotRow
+                    key={entry.source}
+                    entry={entry}
+                    sumDist={sumDist}
+                    color={SOURCE_COLOR[entry.source] ?? meta.color}
+                  />
+                ))}
+              </div>
+            </div>
+          )
+        })}
+        {totalEntries === 0 && (
+          <p className="text-sm text-zinc-400 text-center py-4">Cargando datos…</p>
+        )}
+      </CardContent>
+    </Card>
+  )
+}
+
 export function TopCombosPage() {
   const navigate = useNavigate()
 
@@ -433,6 +614,8 @@ export function TopCombosPage() {
           </Tabs>
         </CardContent>
       </Card>
+
+      <AllCombosSnapshot />
 
       {/* Method legend */}
       <Card className="border-dashed">
