@@ -26,29 +26,29 @@ import type { SuggestedCombo } from '@/components/SuggestedCombosCard'
 import { InfoTip } from '@/components/ui/info-tip'
 
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
+function StatCard({ label, value, color }: { label: string; value: string | number; color?: string }) {
   return (
-    <Card>
+    <Card className="overflow-hidden" style={color ? { borderTopColor: color, borderTopWidth: 2 } : undefined}>
       <CardContent className="pt-5">
         <p className="text-xs text-zinc-500 dark:text-zinc-400">{label}</p>
-        <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-zinc-100">{value}</p>
+        <p className="mt-1 text-2xl font-bold" style={{ color: color ?? undefined }}>{value}</p>
       </CardContent>
     </Card>
   )
 }
 
-function FrequencyRow({ nf, rank }: { nf: NumberFrequency; rank: number }) {
+function FrequencyRow({ nf, rank, color = '#7c3aed' }: { nf: NumberFrequency; rank: number; color?: string }) {
   return (
     <div className="flex items-center gap-2 py-2 text-sm border-b border-zinc-100 dark:border-zinc-800 last:border-0">
       <span className="w-5 text-right text-zinc-400 text-xs shrink-0">{rank}</span>
-      <span className="w-8 h-8 flex items-center justify-center rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 font-bold text-sm shrink-0">
+      <span className="w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm shrink-0 text-white" style={{ background: color }}>
         {nf.number}
       </span>
       <div className="flex-1 min-w-0">
         <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
           <div
-            className="h-full rounded-full bg-violet-500"
-            style={{ width: `${Math.min(nf.percentage * 5, 100)}%` }}
+            className="h-full rounded-full"
+            style={{ width: `${Math.min(nf.percentage * 5, 100)}%`, background: color }}
           />
         </div>
       </div>
@@ -62,15 +62,20 @@ function FrequencyRow({ nf, rank }: { nf: NumberFrequency; rank: number }) {
   )
 }
 
-function DueNumberCard({ dn, rank }: { dn: DueNumber; rank: number }) {
+function DueNumberCard({ dn, rank, color = '#7c3aed' }: { dn: DueNumber; rank: number; color?: string }) {
   const pct   = Math.min((dn.dueScore / 2) * 100, 100)
-  const level = dn.dueScore >= 1.5 ? 'hot' : dn.dueScore >= 1.0 ? 'warning' : 'secondary'
+  const heat  = Math.min((dn.dueScore - 1) / 2, 1)
+  const ballColor = dn.dueScore >= 1.5 ? '#ef4444' : dn.dueScore >= 1.0 ? '#f59e0b' : color
   const label = dn.dueScore >= 1.5 ? 'Muy pendiente' : dn.dueScore >= 1.0 ? 'Pendiente' : 'Normal'
+  const barColor  = dn.dueScore >= 1.5 ? '#ef4444' : dn.dueScore >= 1.0 ? '#f59e0b' : color
 
   return (
     <div className="flex items-center gap-3 py-3 border-b border-zinc-100 dark:border-zinc-800 last:border-0">
       <span className="w-5 text-right text-zinc-400 text-xs shrink-0">{rank}</span>
-      <span className="w-10 h-10 flex items-center justify-center rounded-full bg-violet-600 text-white font-bold text-base shrink-0">
+      <span
+        className="w-10 h-10 flex items-center justify-center rounded-full text-white font-bold text-base shrink-0 shadow-sm"
+        style={{ background: ballColor }}
+      >
         {dn.number}
       </span>
       <div className="flex-1 min-w-0 flex flex-col gap-1">
@@ -78,22 +83,32 @@ function DueNumberCard({ dn, rank }: { dn: DueNumber; rank: number }) {
           <span className="text-sm font-medium text-zinc-700 dark:text-zinc-300">
             Sale c/ <span className="font-bold">{dn.avgInterval.toFixed(1)}</span> sorteos
           </span>
-          <Badge variant={level}>{label}</Badge>
+          <span
+            className="text-[10px] font-bold px-2 py-0.5 rounded-full text-white shrink-0"
+            style={{ background: ballColor }}
+          >
+            {label}
+          </span>
         </div>
         <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
           <div
-            className={`h-full rounded-full transition-all ${dn.dueScore >= 1.0 ? 'bg-red-500' : 'bg-violet-400'}`}
-            style={{ width: `${pct}%` }}
+            className="h-full rounded-full transition-all"
+            style={{ width: `${pct}%`, background: barColor }}
           />
         </div>
         <div className="flex gap-3 text-xs text-zinc-500 dark:text-zinc-400">
           <span>Sin salir: <b className="text-zinc-700 dark:text-zinc-300">{dn.drawsSinceLast}</b></span>
           <span className="flex items-center gap-1">
-            Score: <b className="text-zinc-700 dark:text-zinc-300">{dn.dueScore.toFixed(2)}</b>
+            Score: <b style={{ color: ballColor }}>{dn.dueScore.toFixed(2)}×</b>
             <InfoTip text="Due-score = sorteos sin salir ÷ intervalo promedio histórico. Un score > 1.0 indica que ya lleva más sorteos sin aparecer que su promedio." />
           </span>
           <span className="hidden sm:inline">Apariciones: <b className="text-zinc-700 dark:text-zinc-300">{formatNumber(dn.frequency)}</b></span>
         </div>
+        {heat > 0 && (
+          <div className="h-1 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+            <div className="h-full rounded-full" style={{ width: `${heat * 100}%`, background: barColor }} />
+          </div>
+        )}
       </div>
     </div>
   )
@@ -103,17 +118,17 @@ function DueNumberCard({ dn, rank }: { dn: DueNumber; rank: number }) {
 
 const WINDOW_OPTIONS = [50, 100, 200, 500] as const
 
-function TrendRow({ wf }: { wf: WindowedFrequency }) {
+function TrendRow({ wf, color = '#7c3aed' }: { wf: WindowedFrequency; color?: string }) {
   const up   = wf.trend > 0
   const down = wf.trend < 0
   return (
     <div className="flex items-center gap-2 py-2 text-sm border-b border-zinc-100 dark:border-zinc-800 last:border-0">
-      <span className="w-8 h-8 flex items-center justify-center rounded-full bg-violet-100 text-violet-800 dark:bg-violet-900/40 dark:text-violet-300 font-bold text-sm shrink-0">
+      <span className="w-8 h-8 flex items-center justify-center rounded-full font-bold text-sm shrink-0 text-white" style={{ background: color }}>
         {wf.number}
       </span>
       <div className="flex-1 min-w-0">
         <div className="h-2 rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
-          <div className="h-full rounded-full bg-violet-500" style={{ width: `${Math.min(wf.percentage * 5, 100)}%` }} />
+          <div className="h-full rounded-full" style={{ width: `${Math.min(wf.percentage * 5, 100)}%`, background: color }} />
         </div>
       </div>
       <span className="w-12 text-right text-zinc-700 dark:text-zinc-300 font-medium shrink-0text-xs">
@@ -343,7 +358,7 @@ function WindowedFrequenciesTab({ typeId }: { typeId: LotteryTypeId }) {
               <CardHeader><CardTitle>En racha positiva (↑ vs histórico)</CardTitle></CardHeader>
               <CardContent>
                 {[...data].sort((a, b) => b.trend - a.trend).slice(0, 15).map(wf => (
-                  <TrendRow key={wf.number} wf={wf} />
+                  <TrendRow key={wf.number} wf={wf} color="#10b981" />
                 ))}
               </CardContent>
             </Card>
@@ -351,7 +366,7 @@ function WindowedFrequenciesTab({ typeId }: { typeId: LotteryTypeId }) {
               <CardHeader><CardTitle>En racha negativa (↓ vs histórico)</CardTitle></CardHeader>
               <CardContent>
                 {[...data].sort((a, b) => a.trend - b.trend).slice(0, 15).map(wf => (
-                  <TrendRow key={wf.number} wf={wf} />
+                  <TrendRow key={wf.number} wf={wf} color="#f59e0b" />
                 ))}
               </CardContent>
             </Card>
@@ -1666,52 +1681,75 @@ export function GamePage() {
   return (
     <div className="flex flex-col gap-4">
 
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <span className="text-3xl">{meta.icon}</span>
+      {/* Header hero */}
+      <div
+        className="rounded-2xl p-5 flex flex-wrap items-center justify-between gap-4"
+        style={{ background: `linear-gradient(135deg, ${meta.color}18 0%, ${meta.color}08 100%)`, borderLeft: `4px solid ${meta.color}` }}
+      >
+        <div className="flex items-center gap-4">
+          <span
+            className="flex h-14 w-14 items-center justify-center rounded-2xl text-3xl shadow-sm"
+            style={{ background: meta.color + '25' }}
+          >
+            {meta.icon}
+          </span>
           <div>
-            <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">{meta.label}</h1>
-            <p className="text-xs text-zinc-500 dark:text-zinc-400">
-              Rango {meta.range} · {meta.numbers} números
+            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{meta.label}</h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              Rango {meta.range} · {meta.numbers} números por sorteo
             </p>
           </div>
         </div>
-        {isAdmin && (
-          <Button variant="outline" size="sm" onClick={() => sync.mutate(undefined, {
-            onSuccess: () => toast.success(`${meta.label} sincronizado`),
-            onError: (err) => toast.error(`Error: ${err.message}`),
-          })} disabled={sync.isPending}>
-            {sync.isPending ? <Spinner className="h-4 w-4" /> : null}
-            Sincronizar
-          </Button>
-        )}
+        <div className="flex items-center gap-3">
+          {stats && (
+            <div className="flex gap-4 text-center">
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-400">Sorteos</p>
+                <p className="text-lg font-bold" style={{ color: meta.color }}>{formatNumber(stats.totalDraws)}</p>
+              </div>
+              <div className="w-px bg-zinc-200 dark:bg-zinc-700" />
+              <div>
+                <p className="text-[10px] uppercase tracking-wider text-zinc-400">Último</p>
+                <p className="text-sm font-semibold text-zinc-700 dark:text-zinc-300">{formatDate(stats.lastDrawDate)}</p>
+              </div>
+            </div>
+          )}
+          {isAdmin && (
+            <Button variant="outline" size="sm" onClick={() => sync.mutate(undefined, {
+              onSuccess: () => toast.success(`${meta.label} sincronizado`),
+              onError: (err) => toast.error(`Error: ${err.message}`),
+            })} disabled={sync.isPending}>
+              {sync.isPending ? <Spinner className="h-4 w-4" /> : null}
+              Sincronizar
+            </Button>
+          )}
+        </div>
       </div>
 
       <Tabs defaultValue="due">
         <TabsList className="flex-wrap h-auto gap-y-1">
           {/* Vista general */}
-          <TabsTrigger value="due">Por salir</TabsTrigger>
-          <TabsTrigger value="trend">Tendencia</TabsTrigger>
-          <TabsTrigger value="balance">Balance</TabsTrigger>
-          <TabsTrigger value="sum">Suma</TabsTrigger>
-          <TabsTrigger value="stats">Histórico</TabsTrigger>
-          <TabsTrigger value="freqs">Frecuencias</TabsTrigger>
-          <TabsTrigger value="hotcold">Cal / Fríos</TabsTrigger>
+          <TabsTrigger value="due">🔴 Por salir</TabsTrigger>
+          <TabsTrigger value="trend">📈 Tendencia</TabsTrigger>
+          <TabsTrigger value="balance">⚖️ Balance</TabsTrigger>
+          <TabsTrigger value="sum">∑ Suma</TabsTrigger>
+          <TabsTrigger value="stats">📋 Histórico</TabsTrigger>
+          <TabsTrigger value="freqs">🔢 Frecuencias</TabsTrigger>
+          <TabsTrigger value="hotcold">🌡️ Cal/Fríos</TabsTrigger>
           {/* Separador visual */}
           <span className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 self-center" />
           {/* Análisis avanzado */}
-          <TabsTrigger value="pairs">Pares</TabsTrigger>
-          <TabsTrigger value="bayesian">Bayesiano</TabsTrigger>
-          <TabsTrigger value="backtest">Backtest</TabsTrigger>
-          <TabsTrigger value="chisq">Chi²</TabsTrigger>
+          <TabsTrigger value="pairs">🔗 Pares</TabsTrigger>
+          <TabsTrigger value="bayesian">🧮 Bayesiano</TabsTrigger>
+          <TabsTrigger value="backtest">🔬 Backtest</TabsTrigger>
+          <TabsTrigger value="chisq">χ² Chi²</TabsTrigger>
           <span className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 self-center" />
-          <TabsTrigger value="position">Posición</TabsTrigger>
-          <TabsTrigger value="calendar">Calendario</TabsTrigger>
-          <TabsTrigger value="consecutive">Consecutivos</TabsTrigger>
-          <TabsTrigger value="picker">Mis números</TabsTrigger>
+          <TabsTrigger value="position">📍 Posición</TabsTrigger>
+          <TabsTrigger value="calendar">📅 Calendario</TabsTrigger>
+          <TabsTrigger value="consecutive">🔁 Consecutivos</TabsTrigger>
+          <TabsTrigger value="picker">🎯 Mis números</TabsTrigger>
           <span className="h-5 w-px bg-zinc-300 dark:bg-zinc-600 mx-1 self-center" />
-          <TabsTrigger value="draws">Últimos sorteos</TabsTrigger>
+          <TabsTrigger value="draws">📜 Sorteos</TabsTrigger>
         </TabsList>
 
         {/* ── Por salir ── */}
@@ -1748,7 +1786,7 @@ export function GamePage() {
                 </CardHeader>
                 <CardContent>
                   {dueNums.map((dn, i) => (
-                    <DueNumberCard key={dn.number} dn={dn} rank={i + 1} />
+                    <DueNumberCard key={dn.number} dn={dn} rank={i + 1} color={meta.color} />
                   ))}
                 </CardContent>
               </Card>
@@ -1836,10 +1874,10 @@ export function GamePage() {
                 )
               })()}
               <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
-                <StatCard label="Total sorteos"   value={formatNumber(stats.totalDraws)} />
-                <StatCard label="Primer sorteo"   value={formatDate(stats.firstDrawDate)} />
-                <StatCard label="Último sorteo"   value={formatDate(stats.lastDrawDate)} />
-                <StatCard label="Sin salir nunca" value={stats.numbersNeverDrawn.length} />
+                <StatCard label="Total sorteos"   value={formatNumber(stats.totalDraws)}   color={meta.color} />
+                <StatCard label="Primer sorteo"   value={formatDate(stats.firstDrawDate)} color={meta.color} />
+                <StatCard label="Último sorteo"   value={formatDate(stats.lastDrawDate)}   color={meta.color} />
+                <StatCard label="Sin salir nunca" value={stats.numbersNeverDrawn.length}   color={meta.color} />
               </div>
               {stats.numbersNeverDrawn.length > 0 && (
                 <Card>
@@ -1860,13 +1898,13 @@ export function GamePage() {
                   <Card>
                     <CardHeader><CardTitle>Más frecuentes</CardTitle></CardHeader>
                     <CardContent>
-                      {stats.mostFrequent.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} />)}
+                      {stats.mostFrequent.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} color={meta.color} />)}
                     </CardContent>
                   </Card>
                   <Card>
                     <CardHeader><CardTitle>Menos frecuentes</CardTitle></CardHeader>
                     <CardContent>
-                      {stats.leastFrequent.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} />)}
+                      {stats.leastFrequent.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} color={meta.color} />)}
                     </CardContent>
                   </Card>
                 </div>
@@ -1989,7 +2027,7 @@ export function GamePage() {
                 <CardContent>
                   {loadingHot
                     ? <div className="flex flex-col gap-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-8 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />)}</div>
-                    : hot?.length ? hot.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} />) : <p className="text-sm text-zinc-500">Sin datos.</p>}
+                    : hot?.length ? hot.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} color="#ef4444" />) : <p className="text-sm text-zinc-500">Sin datos.</p>}
                 </CardContent>
               </Card>
               <Card>
@@ -2001,7 +2039,7 @@ export function GamePage() {
                 <CardContent>
                   {loadingCold
                     ? <div className="flex flex-col gap-2">{Array.from({ length: 5 }).map((_, i) => <div key={i} className="h-8 rounded bg-zinc-100 dark:bg-zinc-800 animate-pulse" />)}</div>
-                    : cold?.length ? cold.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} />) : <p className="text-sm text-zinc-500">Sin datos.</p>}
+                    : cold?.length ? cold.map((nf, i) => <FrequencyRow key={nf.number} nf={nf} rank={i + 1} color="#0ea5e9" />) : <p className="text-sm text-zinc-500">Sin datos.</p>}
                 </CardContent>
               </Card>
             </div>

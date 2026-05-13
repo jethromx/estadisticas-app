@@ -9,6 +9,7 @@ import {
   useBalanceAnalysis, useSumDistribution,
   usePairAnalysis, useChiSquare, useBacktest, useBayesianAnalysis,
   useDrawResults, useSavePrediction,
+  usePositionAnalysis, useCalendarFrequency,
 } from '@/api/queries'
 import { SuggestedCombosCard, buildCombo } from '@/components/SuggestedCombosCard'
 import type { SuggestedCombo } from '@/components/SuggestedCombosCard'
@@ -21,6 +22,7 @@ import { cn, formatNumber } from '@/lib/utils'
 import type {
   LotteryTypeId, DueNumber, DrawResult, WindowedFrequency, BalanceAnalysis, SumDistribution,
   NumberPair, ChiSquareResult, BacktestResult, BayesianNumber, GeneratedCombo,
+  PositionAnalysis, CalendarFrequency,
 } from '@/types/lottery'
 
 // ── Constants ────────────────────────────────────────────────────────────────
@@ -2510,6 +2512,280 @@ function SumRecurrenceTable({ drawsMap }: { drawsMap: Record<string, DrawResult[
   )
 }
 
+// ── PositionComparison ────────────────────────────────────────────────────────
+
+function PositionComparison({
+  posMap,
+}: {
+  posMap: Record<string, PositionAnalysis | undefined>
+}) {
+  const hasAny = GAMES.some(g => (posMap[g]?.positions?.length ?? 0) > 0)
+  if (!hasAny) {
+    return <p className="text-sm text-zinc-400 dark:text-zinc-500 py-4">Sin datos de posición.</p>
+  }
+
+  const numPositions = Math.max(...GAMES.map(g => posMap[g]?.positions?.length ?? 0))
+  const maxNum = 56
+
+  const pct = (v: number) => (v / maxNum) * 100
+
+  return (
+    <div className="flex flex-col gap-6">
+      <p className="text-xs text-zinc-500 dark:text-zinc-400 leading-relaxed">
+        Cada barra muestra el rango histórico por posición (ordenada de menor a mayor) en cada sorteo.
+        Las zonas de color muestran P10–P90 (claro) y P25–P75 (medio). La línea vertical es la mediana.
+        Los tres juegos comparten el rango 1–56, lo que permite compararlos directamente.
+      </p>
+      {Array.from({ length: numPositions }, (_, i) => i + 1).map(pos => (
+        <div key={pos} className="flex flex-col gap-2">
+          <p className="text-xs font-semibold text-zinc-600 dark:text-zinc-400">Posición {pos}</p>
+          {GAMES.map(g => {
+            const stats = posMap[g]?.positions?.find(p => p.position === pos)
+            if (!stats) return null
+            return (
+              <div key={g} className="flex items-center gap-3">
+                <span
+                  className="w-24 text-xs font-medium shrink-0"
+                  style={{ color: GAME_COLOR[g] }}
+                >
+                  {GAME_ICON[g]} {GAME_LABEL[g]}
+                </span>
+                <div className="flex-1 relative h-5 bg-zinc-100 dark:bg-zinc-800 rounded-full overflow-hidden">
+                  <div
+                    className="absolute h-full rounded-full opacity-40"
+                    style={{
+                      background: GAME_COLOR[g],
+                      left:  `${pct(stats.p10)}%`,
+                      width: `${pct(stats.p90 - stats.p10)}%`,
+                    }}
+                  />
+                  <div
+                    className="absolute h-full rounded-full opacity-70"
+                    style={{
+                      background: GAME_COLOR[g],
+                      left:  `${pct(stats.p25)}%`,
+                      width: `${pct(stats.p75 - stats.p25)}%`,
+                    }}
+                  />
+                  <div
+                    className="absolute h-full w-0.5"
+                    style={{ background: GAME_COLOR[g], left: `${pct(stats.p50)}%` }}
+                  />
+                </div>
+                <span className="text-xs text-zinc-400 shrink-0 tabular-nums w-36 text-right">
+                  {stats.recommendedMin}–{stats.recommendedMax} · μ={stats.mean.toFixed(0)}
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      ))}
+
+      {/* Consensus recommended ranges */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Rangos recomendados comparados</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Rango recomendado (P10–P90) por posición. Donde los tres juegos coinciden,
+            el rango es más confiable.
+          </p>
+        </CardHeader>
+        <CardContent className="overflow-x-auto">
+          <table className="w-full text-xs min-w-[480px]">
+            <thead>
+              <tr className="border-b border-zinc-100 dark:border-zinc-800 text-left text-zinc-400 dark:text-zinc-500">
+                <th className="pb-2 pr-3">Pos.</th>
+                {GAMES.map(g => (
+                  <th key={g} className="pb-2 pr-3" style={{ color: GAME_COLOR[g] }}>
+                    {GAME_ICON[g]} {GAME_LABEL[g]}
+                  </th>
+                ))}
+                <th className="pb-2">Consenso</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Array.from({ length: numPositions }, (_, i) => i + 1).map(pos => {
+                const statsArr = GAMES.map(g => posMap[g]?.positions?.find(p => p.position === pos)).filter(Boolean) as NonNullable<PositionAnalysis['positions'][0]>[]
+                const consensusMin = statsArr.length ? Math.max(...statsArr.map(s => s.recommendedMin)) : null
+                const consensusMax = statsArr.length ? Math.min(...statsArr.map(s => s.recommendedMax)) : null
+                const overlap = consensusMin !== null && consensusMax !== null && consensusMin <= consensusMax
+
+                return (
+                  <tr key={pos} className="border-b border-zinc-50 dark:border-zinc-900 hover:bg-zinc-50 dark:hover:bg-zinc-800/40">
+                    <td className="py-2 pr-3 font-bold text-zinc-700 dark:text-zinc-300">{pos}</td>
+                    {GAMES.map(g => {
+                      const stats = posMap[g]?.positions?.find(p => p.position === pos)
+                      return (
+                        <td key={g} className="py-2 pr-3 tabular-nums text-zinc-600 dark:text-zinc-400">
+                          {stats ? `${stats.recommendedMin}–${stats.recommendedMax}` : '–'}
+                        </td>
+                      )
+                    })}
+                    <td className="py-2">
+                      {overlap ? (
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                          {consensusMin}–{consensusMax}
+                        </span>
+                      ) : (
+                        <span className="text-amber-500">sin solapamiento</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
+// ── CalendarComparison ────────────────────────────────────────────────────────
+
+function CalendarComparison({
+  calMap,
+}: {
+  calMap: Record<string, CalendarFrequency | undefined>
+}) {
+  const hasAny = GAMES.some(g => calMap[g] !== undefined)
+  if (!hasAny) {
+    return <p className="text-sm text-zinc-400 dark:text-zinc-500 py-4">Sin datos de calendario.</p>
+  }
+
+  // Numbers hot across multiple games
+  const dayHotAcrossGames = useMemo(() => {
+    const days = calMap[GAMES[0]]?.byDayOfWeek?.map(d => d.dayOfWeek) ?? []
+    return days.map(dow => {
+      const dayData = GAMES.map(g => calMap[g]?.byDayOfWeek?.find(d => d.dayOfWeek === dow)).filter(Boolean)
+      const dayName = dayData[0]?.dayName ?? ''
+      const drawCount = dayData[0]?.drawCount ?? 0
+      const hotSets = dayData.map(d => new Set(d!.hotNumbers))
+      const allNums = new Set(dayData.flatMap(d => d!.hotNumbers))
+      const crossNums = Array.from(allNums).filter(n => hotSets.filter(s => s.has(n)).length >= 2)
+      return { dow, dayName, drawCount, crossNums, gameHots: dayData.map((d, i) => ({ game: GAMES[i], nums: d!.hotNumbers })) }
+    })
+  }, [calMap])
+
+  const monthHotAcrossGames = useMemo(() => {
+    const months = calMap[GAMES[0]]?.byMonth?.map(m => m.month) ?? []
+    return months.map(month => {
+      const monthData = GAMES.map(g => calMap[g]?.byMonth?.find(m => m.month === month)).filter(Boolean)
+      const monthName = monthData[0]?.monthName ?? ''
+      const hotSets = monthData.map(d => new Set(d!.hotNumbers))
+      const allNums = new Set(monthData.flatMap(d => d!.hotNumbers))
+      const crossNums = Array.from(allNums).filter(n => hotSets.filter(s => s.has(n)).length >= 2)
+      return { month, monthName, crossNums, gameHots: monthData.map((d, i) => ({ game: GAMES[i], nums: d!.hotNumbers })) }
+    })
+  }, [calMap])
+
+  return (
+    <div className="flex flex-col gap-6">
+
+      {/* Day of week */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Números calientes por día de la semana</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Los números resaltados en{' '}
+            <span className="font-semibold text-amber-600 dark:text-amber-400">ámbar</span> son
+            calientes en 2 o más juegos el mismo día.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col gap-4">
+            {dayHotAcrossGames.map(({ dow, dayName, drawCount, crossNums, gameHots }) => (
+              <div key={dow} className="flex flex-col gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-sm font-semibold text-zinc-700 dark:text-zinc-200 capitalize w-20 shrink-0">
+                    {dayName}
+                  </span>
+                  <span className="text-xs text-zinc-400">{formatNumber(drawCount)} sorteos</span>
+                  {crossNums.length > 0 && (
+                    <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">
+                      {crossNums.length} número{crossNums.length !== 1 ? 's' : ''} compartido{crossNums.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-col gap-1.5 pl-2">
+                  {gameHots.map(({ game, nums }) => (
+                    <div key={game} className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs shrink-0 w-20" style={{ color: GAME_COLOR[game] }}>
+                        {GAME_ICON[game]} {GAME_LABEL[game]}
+                      </span>
+                      <div className="flex flex-wrap gap-1">
+                        {nums.map(n => (
+                          <span
+                            key={n}
+                            className={cn(
+                              'h-6 w-6 flex items-center justify-center rounded-full text-xs font-bold',
+                              crossNums.includes(n)
+                                ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 ring-1 ring-amber-400'
+                                : 'text-white',
+                            )}
+                            style={!crossNums.includes(n) ? { background: GAME_COLOR[game] + 'aa' } : undefined}
+                          >
+                            {n}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Month */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Números calientes por mes</CardTitle>
+          <p className="text-xs text-zinc-500 dark:text-zinc-400">
+            Los números en{' '}
+            <span className="font-semibold text-amber-600 dark:text-amber-400">ámbar</span> son
+            calientes en 2 o más juegos en ese mes.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-5 grid-cols-2 sm:grid-cols-3 md:grid-cols-4">
+            {monthHotAcrossGames.map(({ month, monthName, crossNums, gameHots }) => (
+              <div key={month} className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-zinc-600 dark:text-zinc-400 capitalize">
+                  {monthName}
+                  {crossNums.length > 0 && (
+                    <span className="ml-1 text-amber-600 dark:text-amber-400">({crossNums.length}✦)</span>
+                  )}
+                </span>
+                {gameHots.map(({ game, nums }) => (
+                  <div key={game} className="flex flex-wrap gap-1">
+                    {nums.map(n => (
+                      <span
+                        key={n}
+                        className={cn(
+                          'h-5 w-5 flex items-center justify-center rounded-full text-[10px] font-bold',
+                          crossNums.includes(n)
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300 ring-1 ring-amber-400'
+                            : 'text-white',
+                        )}
+                        style={!crossNums.includes(n) ? { background: GAME_COLOR[game] + 'aa' } : undefined}
+                        title={`${n} — ${GAME_LABEL[game]}`}
+                      >
+                        {n}
+                      </span>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function ComparativePage() {
@@ -2601,6 +2877,16 @@ export function ComparativePage() {
   const { data: bayRevancha,   isLoading: lby2 } = useBayesianAnalysis('REVANCHA',   50)
   const { data: bayRevanchita, isLoading: lby3 } = useBayesianAnalysis('REVANCHITA', 50)
 
+  // Position tab
+  const { data: posMelate,     isLoading: lpo1 } = usePositionAnalysis('MELATE')
+  const { data: posRevancha,   isLoading: lpo2 } = usePositionAnalysis('REVANCHA')
+  const { data: posRevanchita, isLoading: lpo3 } = usePositionAnalysis('REVANCHITA')
+
+  // Calendar tab
+  const { data: calMelate,     isLoading: lcal1 } = useCalendarFrequency('MELATE')
+  const { data: calRevancha,   isLoading: lcal2 } = useCalendarFrequency('REVANCHA')
+  const { data: calRevanchita, isLoading: lcal3 } = useCalendarFrequency('REVANCHITA')
+
   // Only core data blocks the spinner
   const loading        = l1  || l2  || l3  || l4  || l5  || l6
   const arimaLoading   = la1 || la2 || la3 || la4 || la5 || la6
@@ -2608,7 +2894,9 @@ export function ComparativePage() {
   const pairsLoading   = lp1 || lp2 || lp3
   const chiLoading     = lc1 || lc2 || lc3
   const backtestLoading = lbt1 || lbt2 || lbt3
-  const bayesLoading   = lby1 || lby2 || lby3
+  const bayesLoading    = lby1 || lby2 || lby3
+  const posLoading      = lpo1 || lpo2 || lpo3
+  const calLoading      = lcal1 || lcal2 || lcal3
 
   const dueMap: Record<string, DueNumber[]> = {
     MELATE:     dueMelate     ?? [],
@@ -2649,6 +2937,16 @@ export function ComparativePage() {
     MELATE:     bayMelate,
     REVANCHA:   bayRevancha,
     REVANCHITA: bayRevanchita,
+  }
+  const posMap: Record<string, PositionAnalysis | undefined> = {
+    MELATE:     posMelate,
+    REVANCHA:   posRevancha,
+    REVANCHITA: posRevanchita,
+  }
+  const calMap: Record<string, CalendarFrequency | undefined> = {
+    MELATE:     calMelate,
+    REVANCHA:   calRevancha,
+    REVANCHITA: calRevanchita,
   }
 
   const hasData = GAMES.every(g => dueMap[g].length > 0 && trendMap[g].length > 0)
@@ -2745,6 +3043,8 @@ export function ComparativePage() {
           <TabsTrigger value="backtest">Backtest</TabsTrigger>
           <TabsTrigger value="chisq">Chi²</TabsTrigger>
           <TabsTrigger value="arima">ARIMA</TabsTrigger>
+          <TabsTrigger value="posicion">Posición</TabsTrigger>
+          <TabsTrigger value="calendario">Calendario</TabsTrigger>
           <TabsTrigger value="sugerencias">Sugerencias</TabsTrigger>
         </TabsList>
 
@@ -3091,6 +3391,42 @@ export function ComparativePage() {
               {arimaLoading
                 ? <div className="h-48 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
                 : <ArimaComparison arimaForecasts={arimaForecasts} arimaReady={arimaReady} />}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Tab: Posición ── */}
+        <TabsContent value="posicion">
+          <Card>
+            <CardHeader>
+              <CardTitle>Distribución por posición — comparativo</CardTitle>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Cada número se ordena de menor a mayor dentro de su sorteo. La posición 1 es el número más
+                bajo y la posición 6 el más alto. Las barras muestran el rango histórico de cada juego.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {posLoading
+                ? <div className="h-48 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                : <PositionComparison posMap={posMap} />}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── Tab: Calendario ── */}
+        <TabsContent value="calendario">
+          <Card>
+            <CardHeader>
+              <CardTitle>Frecuencia por calendario — comparativo</CardTitle>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                Números calientes por día de la semana y por mes, cruzando los tres juegos.
+                Los números en ámbar son calientes en 2 o más juegos en ese período.
+              </p>
+            </CardHeader>
+            <CardContent>
+              {calLoading
+                ? <div className="h-48 rounded-lg bg-zinc-100 dark:bg-zinc-800 animate-pulse" />
+                : <CalendarComparison calMap={calMap} />}
             </CardContent>
           </Card>
         </TabsContent>

@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom'
 import {
   AreaChart, Area, ReferenceLine, ResponsiveContainer, Tooltip as RechartsTip,
 } from 'recharts'
-import { LOTTERY_TYPES, formatNumber, formatDate } from '@/lib/utils'
+import { BarChart2, CalendarDays, Gamepad2, Star, Trophy } from 'lucide-react'
+import { LOTTERY_TYPES, formatNumber, formatDate, cn } from '@/lib/utils'
 import { useAuth } from '@/contexts/AuthContext'
 import { toast } from 'sonner'
 import { EmptyState } from '@/components/ui/empty-state'
@@ -147,11 +148,16 @@ function GameCard({ id }: { id: LotteryTypeId }) {
   const loading = statsLoading || drawsLoading
 
   return (
-    <Card className="flex flex-col">
+    <Card className="flex flex-col overflow-hidden" style={{ borderTopColor: meta.color, borderTopWidth: 3 }}>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-2xl">{meta.icon}</span>
+            <span
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-xl shrink-0"
+              style={{ background: meta.color + '20' }}
+            >
+              {meta.icon}
+            </span>
             <div>
               <CardTitle className="text-base">{meta.label}</CardTitle>
               <CardDescription className="text-xs">Rango {meta.range} · {meta.numbers} números</CardDescription>
@@ -236,7 +242,12 @@ function GameCard({ id }: { id: LotteryTypeId }) {
               Sincronizar
             </Button>
           )}
-          <Button size="sm" className={isAdmin ? 'flex-1' : 'w-full'} asChild>
+          <Button
+            size="sm"
+            className={cn(isAdmin ? 'flex-1' : 'w-full', 'text-white border-0')}
+            style={{ background: meta.color }}
+            asChild
+          >
             <Link to={`/game/${id}`}>Analizar</Link>
           </Button>
         </div>
@@ -263,37 +274,60 @@ function GlobalKPIs() {
     .filter(Boolean) as string[]
   const mostRecent = lastDates.sort().at(-1) ?? null
 
+  const kpis = [
+    {
+      label: 'Total sorteos',
+      value: loading ? '…' : formatNumber(totalDraws),
+      sub:   'Melate + Revancha + Revanchita',
+      icon:  BarChart2,
+      iconBg: 'bg-violet-100 dark:bg-violet-900/40',
+      iconColor: 'text-violet-600 dark:text-violet-400',
+      valueColor: 'text-violet-700 dark:text-violet-300',
+    },
+    {
+      label: 'Último sorteo',
+      value: loading ? '…' : formatDate(mostRecent),
+      sub:   'Fecha más reciente en BD',
+      icon:  CalendarDays,
+      iconBg: 'bg-sky-100 dark:bg-sky-900/40',
+      iconColor: 'text-sky-600 dark:text-sky-400',
+      valueColor: 'text-sky-700 dark:text-sky-300',
+    },
+    {
+      label: 'Juegos activos',
+      value: '3',
+      sub:   'Melate, Revancha, Revanchita',
+      icon:  Gamepad2,
+      iconBg: 'bg-emerald-100 dark:bg-emerald-900/40',
+      iconColor: 'text-emerald-600 dark:text-emerald-400',
+      valueColor: 'text-emerald-700 dark:text-emerald-300',
+    },
+    {
+      label: 'Predicciones',
+      value: predictionsPage ? String(predCount) : '…',
+      sub:   'Combinaciones guardadas',
+      icon:  Star,
+      iconBg: 'bg-amber-100 dark:bg-amber-900/40',
+      iconColor: 'text-amber-600 dark:text-amber-400',
+      valueColor: 'text-amber-700 dark:text-amber-300',
+    },
+  ]
+
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
-      {[
-        {
-          label: 'Total sorteos',
-          value: loading ? '…' : formatNumber(totalDraws),
-          sub: 'Melate + Revancha + Revanchita',
-        },
-        {
-          label: 'Último sorteo',
-          value: loading ? '…' : formatDate(mostRecent),
-          sub: 'Fecha más reciente en BD',
-        },
-        {
-          label: 'Juegos activos',
-          value: '3',
-          sub: 'Melate, Revancha, Revanchita',
-        },
-        {
-          label: 'Predicciones',
-          value: predictionsPage ? String(predCount) : '…',
-          sub: 'Combinaciones guardadas',
-        },
-      ].map(({ label, value, sub }) => (
+      {kpis.map(({ label, value, sub, icon: Icon, iconBg, iconColor, valueColor }) => (
         <div
           key={label}
-          className="rounded-lg border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"
+          className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900 flex flex-col gap-3"
         >
-          <p className="text-xs text-zinc-500 dark:text-zinc-400">{label}</p>
-          <p className="mt-1 text-2xl font-bold text-zinc-900 dark:text-zinc-100">{value}</p>
-          <p className="mt-0.5 text-[11px] text-zinc-400">{sub}</p>
+          <div className={cn('inline-flex h-9 w-9 items-center justify-center rounded-lg', iconBg)}>
+            <Icon className={cn('h-4 w-4', iconColor)} />
+          </div>
+          <div>
+            <p className="text-xs text-zinc-500 dark:text-zinc-400">{label}</p>
+            <p className={cn('mt-0.5 text-2xl font-bold tabular-nums', valueColor)}>{value}</p>
+            <p className="mt-0.5 text-[11px] text-zinc-400">{sub}</p>
+          </div>
         </div>
       ))}
     </div>
@@ -320,19 +354,31 @@ function DueNumbersRow({ id }: { id: LotteryTypeId }) {
           ))}
         </div>
       ) : due?.length ? (
-        <div className="flex flex-wrap gap-1.5">
-          {due.slice(0, 6).map((n: DueNumber) => (
-            <div key={n.number} className="flex flex-col items-center gap-0.5">
-              <span
-                title={`Due score: ${n.dueScore.toFixed(2)} · ${n.drawsSinceLast} sorteos sin salir`}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-sm font-bold text-white cursor-help"
-                style={{ backgroundColor: meta.color, opacity: 0.5 + Math.min(n.dueScore - 1, 1) * 0.5 }}
-              >
-                {n.number}
-              </span>
-              <span className="text-[9px] tabular-nums text-zinc-400">{n.dueScore.toFixed(1)}x</span>
-            </div>
-          ))}
+        <div className="flex flex-col gap-1.5">
+          {due.slice(0, 6).map((n: DueNumber) => {
+            const heat = Math.min((n.dueScore - 1) / 2, 1)   // 0 at 1x, 1 at 3x+
+            const heatColor = heat > 0.66 ? '#ef4444' : heat > 0.33 ? '#f59e0b' : meta.color
+            return (
+              <div key={n.number} className="flex items-center gap-2">
+                <span
+                  title={`Due score: ${n.dueScore.toFixed(2)} · ${n.drawsSinceLast} sorteos sin salir`}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white cursor-help"
+                  style={{ background: heatColor }}
+                >
+                  {n.number}
+                </span>
+                <div className="flex-1 flex flex-col gap-0.5 min-w-0">
+                  <div className="h-2 w-full rounded-full bg-zinc-100 dark:bg-zinc-800 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${Math.max(heat * 100, 4)}%`, background: heatColor }}
+                    />
+                  </div>
+                  <span className="text-[9px] tabular-nums text-zinc-400">{n.dueScore.toFixed(1)}× · {n.drawsSinceLast}s</span>
+                </div>
+              </div>
+            )
+          })}
         </div>
       ) : (
         <p className="text-xs text-zinc-400">Sin datos</p>
@@ -430,11 +476,17 @@ function RecentPredictions() {
                 {[...(p.combos[0]?.numbers ?? [])].sort((a: number, b: number) => a - b).map((n: number) => (
                   <span
                     key={n}
-                    className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 text-[10px] font-semibold text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300"
+                    className="inline-flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold text-white"
+                    style={{ background: meta?.color ?? '#7c3aed' }}
                   >
                     {n}
                   </span>
                 ))}
+                {p.combos.length > 1 && (
+                  <span className="inline-flex h-6 px-1.5 items-center justify-center rounded-full text-[10px] font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400">
+                    +{p.combos.length - 1}
+                  </span>
+                )}
               </div>
             </Link>
           )
@@ -468,18 +520,6 @@ function SyncAllButton() {
 
 // ── Último sorteo ─────────────────────────────────────────────────────────────
 
-function DrawBall({ n, highlight }: { n: number; highlight?: boolean }) {
-  return (
-    <span className={`inline-flex h-9 w-9 items-center justify-center rounded-full font-bold text-sm tabular-nums shadow-sm
-      ${highlight
-        ? 'bg-violet-600 text-white ring-2 ring-violet-300 dark:ring-violet-700'
-        : 'bg-violet-100 dark:bg-violet-900/50 text-violet-800 dark:text-violet-200'
-      }`}>
-      {String(n).padStart(2, '0')}
-    </span>
-  )
-}
-
 function LastDrawResults() {
   const types = LOTTERY_TYPES
   const results = types.map(t => useDrawResults(t.id as LotteryTypeId, 1)) // eslint-disable-line react-hooks/rules-of-hooks
@@ -507,42 +547,69 @@ function LastDrawResults() {
           if (!draw) return null
           const fmt = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', maximumFractionDigits: 0 })
           return (
-            <div key={meta.id} className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-3">
-              <div className="flex items-center justify-between gap-2">
+            <div
+              key={meta.id}
+              className="rounded-xl border-2 bg-white dark:bg-zinc-900 p-4 flex flex-col gap-3 overflow-hidden relative"
+              style={{ borderColor: meta.color + '55' }}
+            >
+              {/* color accent strip */}
+              <div className="absolute top-0 left-0 right-0 h-1 rounded-t-xl" style={{ background: meta.color }} />
+
+              {/* header */}
+              <div className="flex items-center justify-between gap-2 pt-1">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-lg">{meta.icon}</span>
+                  <span className="text-xl">{meta.icon}</span>
                   <span className="text-sm font-bold text-zinc-800 dark:text-zinc-100">{meta.label}</span>
                 </div>
                 <div className="text-right">
-                  <p className="text-[10px] text-zinc-400">Sorteo #{draw.drawNumber}</p>
-                  <p className="text-[10px] text-zinc-400">{new Date(draw.drawDate).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                  <p className="text-[10px] font-medium text-zinc-400">#{draw.drawNumber}</p>
+                  <p className="text-[10px] text-zinc-400">
+                    {new Date(draw.drawDate).toLocaleDateString('es-MX', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </p>
                 </div>
               </div>
 
+              {/* jackpot as hero */}
+              {draw.jackpotAmount != null && (
+                <div className="flex items-center gap-2 rounded-lg px-3 py-2" style={{ background: meta.color + '15' }}>
+                  <Trophy className="h-4 w-4 shrink-0" style={{ color: meta.color }} />
+                  <div>
+                    <p className="text-[10px] text-zinc-400">Bolsa</p>
+                    <p className="text-base font-bold" style={{ color: meta.color }}>
+                      {fmt.format(draw.jackpotAmount)}
+                    </p>
+                  </div>
+                  {draw.firstPrizeWinners != null && (
+                    <div className="ml-auto text-right">
+                      <p className="text-[10px] text-zinc-400">Ganadores</p>
+                      <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300">
+                        {draw.firstPrizeWinners === 0 ? 'Sin ganador' : draw.firstPrizeWinners}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* numbers */}
               <div className="flex gap-1.5 flex-wrap">
                 {[...draw.numbers].sort((a, b) => a - b).map(n => (
-                  <DrawBall key={n} n={n} />
+                  <span
+                    key={n}
+                    className="inline-flex h-9 w-9 items-center justify-center rounded-full font-bold text-sm tabular-nums text-white shadow-sm"
+                    style={{ background: meta.color }}
+                  >
+                    {String(n).padStart(2, '0')}
+                  </span>
                 ))}
               </div>
 
-              {(draw.jackpotAmount != null || draw.firstPrizeWinners != null) && (
-                <div className="flex items-center justify-between border-t border-zinc-100 dark:border-zinc-800 pt-2">
-                  {draw.jackpotAmount != null && (
-                    <div>
-                      <p className="text-[10px] text-zinc-400">Bolsa</p>
-                      <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                        {fmt.format(draw.jackpotAmount)}
-                      </p>
-                    </div>
-                  )}
-                  {draw.firstPrizeWinners != null && (
-                    <div className="text-right">
-                      <p className="text-[10px] text-zinc-400">Ganadores</p>
-                      <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300">
-                        {draw.firstPrizeWinners === 0 ? 'Ninguno' : draw.firstPrizeWinners}
-                      </p>
-                    </div>
-                  )}
+              {/* fallback winners if no jackpot */}
+              {draw.jackpotAmount == null && draw.firstPrizeWinners != null && (
+                <div className="border-t border-zinc-100 dark:border-zinc-800 pt-2 text-right">
+                  <p className="text-[10px] text-zinc-400">Ganadores</p>
+                  <p className="text-sm font-bold text-zinc-700 dark:text-zinc-300">
+                    {draw.firstPrizeWinners === 0 ? 'Sin ganador' : draw.firstPrizeWinners}
+                  </p>
                 </div>
               )}
             </div>

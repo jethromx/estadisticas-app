@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import { ChevronDown, ChevronUp, Zap, Share2, Star, Trash2, RotateCcw } from 'lucide-react'
+import { ChevronDown, ChevronUp, Zap, Share2, Star, Trash2, RotateCcw, BarChart2, Trophy, TrendingUp, AlertCircle } from 'lucide-react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   LineChart, Line, XAxis, YAxis,
@@ -26,6 +26,14 @@ const GAME_COLORS: Record<string, string> = {
   MELATE: '#7c3aed',
   REVANCHA: '#0ea5e9',
   REVANCHITA: '#10b981',
+}
+
+const GAME_ICONS: Record<string, string> = {
+  MELATE: '🟣', REVANCHA: '🔵', REVANCHITA: '🟢',
+}
+
+const GAME_LABELS_MAP: Record<string, string> = {
+  MELATE: 'Melate', REVANCHA: 'Revancha', REVANCHITA: 'Revanchita',
 }
 
 async function generateShareImage(set: SavedPredictionSet): Promise<Blob> {
@@ -708,12 +716,33 @@ export function PredictionsPage() {
     <div className="flex flex-col gap-6 max-w-4xl mx-auto">
 
       {/* Page header */}
-      <div>
-        <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100">Predicciones</h1>
-        <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
-          Genera combinaciones con el análisis estadístico cruzado de Melate, Revancha y Revanchita,
-          guárdalas y compáralas con los sorteos posteriores.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">Predicciones</h1>
+          <p className="mt-1 text-sm text-zinc-500 dark:text-zinc-400">
+            Genera combinaciones con el análisis estadístico cruzado de Melate, Revancha y Revanchita,
+            guárdalas y compáralas con los sorteos posteriores.
+          </p>
+        </div>
+        {totalElements > 0 && (
+          <div className="flex items-center gap-3 shrink-0">
+            <div className="text-center">
+              <p className="text-2xl font-bold text-violet-600 dark:text-violet-400 tabular-nums">{totalElements}</p>
+              <p className="text-[10px] uppercase tracking-wider text-zinc-400">guardadas</p>
+            </div>
+            {savedSets.filter(s => s.favorite).length > 0 && (
+              <>
+                <div className="w-px h-8 bg-zinc-200 dark:bg-zinc-700" />
+                <div className="text-center">
+                  <p className="text-2xl font-bold text-amber-500 tabular-nums">
+                    {savedSets.filter(s => s.favorite).length}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wider text-zinc-400">⭐ favoritas</p>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Generator */}
@@ -799,21 +828,38 @@ export function PredictionsPage() {
                     paddingBottom: '12px',
                   }}
                 >
-          <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-900">
+          {(() => {
+            const gameColor = GAME_COLORS[set.lotteryType ?? ''] ?? '#7c3aed'
+            return (
+          <div
+            className="rounded-xl border border-zinc-200 dark:border-zinc-700 overflow-hidden bg-white dark:bg-zinc-900"
+            style={{ borderLeftColor: gameColor, borderLeftWidth: 4 }}
+          >
 
             {/* ── Info row: label + date + badges ── */}
             <div className="flex items-start gap-3 px-4 pt-3 pb-2">
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate">{set.label}</p>
-                <p className="text-[11px] text-zinc-400 mt-0.5">
-                  {new Date(set.savedAt).toLocaleString('es-MX', {
-                    day: '2-digit', month: 'short', year: 'numeric',
-                    hour: '2-digit', minute: '2-digit',
-                  })}
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 truncate">{set.label}</p>
+                  {set.favorite && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400 shrink-0" />}
+                </div>
+                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                  <p className="text-[11px] text-zinc-400">
+                    {new Date(set.savedAt).toLocaleString('es-MX', {
+                      day: '2-digit', month: 'short', year: 'numeric',
+                      hour: '2-digit', minute: '2-digit',
+                    })}
+                  </p>
                   {set.lotteryType && (
-                    <span className="ml-1.5 font-medium text-violet-500">{set.lotteryType}</span>
+                    <span
+                      className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full text-white shrink-0"
+                      style={{ background: gameColor }}
+                    >
+                      {GAME_ICONS[set.lotteryType]} {GAME_LABELS_MAP[set.lotteryType] ?? set.lotteryType}
+                    </span>
                   )}
-                </p>
+                  <span className="text-[10px] text-zinc-400">{set.combos.length} combo{set.combos.length !== 1 ? 's' : ''}</span>
+                </div>
               </div>
 
               {/* Action buttons — clearly separated from expand */}
@@ -1076,23 +1122,23 @@ export function PredictionsPage() {
               const r = analysisResults[set.id]
               return (
                 <div className="border-t border-violet-100 dark:border-violet-900/40 bg-violet-50/50 dark:bg-violet-900/10 px-4 py-4 flex flex-col gap-4">
-                  <div className="flex flex-wrap gap-4">
-                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-violet-100 dark:border-violet-900/40 px-4 py-2 min-w-20">
-                      <span className="text-xl font-bold text-violet-600 dark:text-violet-400">{r.drawsAnalyzed}</span>
-                      <span className="text-[10px] text-zinc-400 text-center">sorteos<br/>analizados</span>
-                    </div>
-                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-emerald-100 dark:border-emerald-900/40 px-4 py-2 min-w-20">
-                      <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{r.bestMatchCount}/6</span>
-                      <span className="text-[10px] text-zinc-400 text-center">mejor<br/>acierto</span>
-                    </div>
-                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-sky-100 dark:border-sky-900/40 px-4 py-2 min-w-20">
-                      <span className="text-xl font-bold text-sky-600 dark:text-sky-400">{r.averageMatchCount.toFixed(1)}</span>
-                      <span className="text-[10px] text-zinc-400 text-center">promedio<br/>por combo</span>
-                    </div>
-                    <div className="flex flex-col items-center rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 px-4 py-2 min-w-20">
-                      <span className="text-xl font-bold text-zinc-500">{r.worstMatchCount}/6</span>
-                      <span className="text-[10px] text-zinc-400 text-center">peor<br/>acierto</span>
-                    </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { icon: BarChart2, label: 'Sorteos analizados', value: String(r.drawsAnalyzed),               iconBg: 'bg-violet-100 dark:bg-violet-900/40', iconColor: 'text-violet-600 dark:text-violet-400', valueColor: 'text-violet-700 dark:text-violet-300' },
+                      { icon: Trophy,    label: 'Mejor acierto',       value: `${r.bestMatchCount}/6`,              iconBg: 'bg-emerald-100 dark:bg-emerald-900/40', iconColor: 'text-emerald-600 dark:text-emerald-400', valueColor: 'text-emerald-700 dark:text-emerald-300' },
+                      { icon: TrendingUp,label: 'Promedio por combo',  value: r.averageMatchCount.toFixed(1),       iconBg: 'bg-sky-100 dark:bg-sky-900/40', iconColor: 'text-sky-600 dark:text-sky-400', valueColor: 'text-sky-700 dark:text-sky-300' },
+                      { icon: AlertCircle,label:'Peor acierto',        value: `${r.worstMatchCount}/6`,             iconBg: 'bg-zinc-100 dark:bg-zinc-800', iconColor: 'text-zinc-500', valueColor: 'text-zinc-600 dark:text-zinc-400' },
+                    ].map(({ icon: Icon, label, value, iconBg, iconColor, valueColor }) => (
+                      <div key={label} className="flex flex-col gap-2 rounded-xl bg-white dark:bg-zinc-900 border border-zinc-100 dark:border-zinc-800 p-3">
+                        <div className={cn('inline-flex h-8 w-8 items-center justify-center rounded-lg', iconBg)}>
+                          <Icon className={cn('h-4 w-4', iconColor)} />
+                        </div>
+                        <div>
+                          <p className="text-[10px] text-zinc-400 leading-tight">{label}</p>
+                          <p className={cn('text-xl font-bold tabular-nums', valueColor)}>{value}</p>
+                        </div>
+                      </div>
+                    ))}
                   </div>
 
                   {r.drawsAnalyzed > 0 && r.comboDetails.length > 0 && (
@@ -1179,6 +1225,8 @@ export function PredictionsPage() {
               )
             })()}
           </div>
+            )
+          })()}
                 </div>
               )
             })}
