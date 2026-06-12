@@ -15,17 +15,50 @@ import type {
   BacktestResult,
   BayesianNumber,
   NeuralPrediction,
+  EnsemblePrediction,
+  MLPrediction,
+  MetaPrediction,
+  MLExplanation,
+  BacktestComparison,
+  StreakAnalysis,
+  ConsensusPrediction,
   SavedPredictionSet,
   SavePredictionRequest,
   PredictionAccuracyResult,
+  AggregateAccuracyResult,
   PositionAnalysis,
   ConsecutiveAnalysis,
   CalendarFrequency,
   PagedResponse,
+  PredictionFeedback,
+  ImprovedPrediction,
+  TriplePrediction,
+  EVPrediction,
 } from '@/types/lottery'
 
 const BASE        = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/lottery`
 const PRED_BASE   = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/predictions`
+const BOLETO_BASE = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/boleto`
+const ML_BASE     = `http://localhost:8001`
+
+async function boletoRequest<T>(path: string): Promise<T> {
+  const token = localStorage.getItem('lottery_token')
+  const res = await fetch(`${BOLETO_BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  })
+  if (!res.ok) {
+    if (res.status === 401) window.dispatchEvent(new CustomEvent('auth:unauthorized'))
+    const err = await res.json().catch(() => ({ message: res.statusText }))
+    throw new Error((err as { message?: string }).message ?? 'Error en la solicitud')
+  }
+  return res.json() as Promise<T>
+}
+
+async function mlRequest<T>(path: string): Promise<T> {
+  const res = await fetch(`${ML_BASE}${path}`)
+  if (!res.ok) throw new Error(`ML service error: ${res.status}`)
+  return res.json() as Promise<T>
+}
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = localStorage.getItem('lottery_token')
@@ -115,6 +148,55 @@ export const api = {
 
   calendarFrequency: (type: LotteryTypeId) =>
     request<CalendarFrequency>(`/${type}/calendar-frequency`),
+
+  ensemblePrediction: (type: LotteryTypeId, validationDraws = 30) =>
+    request<EnsemblePrediction>(`/${type}/ensemble-prediction?validationDraws=${validationDraws}`),
+
+  streakAnalysis: (type: LotteryTypeId) =>
+    request<StreakAnalysis>(`/${type}/streak-analysis`),
+
+  consensusPrediction: (type: LotteryTypeId) =>
+    request<ConsensusPrediction>(`/${type}/consensus-prediction`),
+
+  mlPrediction: (type: LotteryTypeId, model = 'best') =>
+    request<MLPrediction>(`/${type}/ml-prediction?model=${model}`),
+
+  mlExplanation: (type: LotteryTypeId, model: string, number: number) =>
+    request<MLExplanation>(`/${type}/ml-explanation?model=${model}&number=${number}`),
+
+  backtestComparison: (type: LotteryTypeId) =>
+    request<BacktestComparison>(`/${type}/backtest-comparison`),
+
+  metaPrediction: (type: LotteryTypeId) =>
+    request<MetaPrediction>(`/${type}/meta-prediction`),
+
+  markovPrediction: (type: LotteryTypeId) =>
+    request<EnsemblePrediction>(`/${type}/markov-prediction`),
+
+  knnPrediction: (type: LotteryTypeId) =>
+    request<EnsemblePrediction>(`/${type}/knn-prediction`),
+
+  metaLearnerPrediction: (type: LotteryTypeId) =>
+    request<EnsemblePrediction>(`/${type}/meta-learner-prediction`),
+
+  improvedPrediction: (type: LotteryTypeId, model = 'best', excludeNumbers: number[] = [], boostNumbers: number[] = []) => {
+    const params = new URLSearchParams({ model })
+    if (excludeNumbers.length) params.set('exclude_numbers', excludeNumbers.join(','))
+    if (boostNumbers.length)   params.set('boost_numbers', boostNumbers.join(','))
+    return mlRequest<ImprovedPrediction>(`/predict/${type}/improved?${params}`)
+  },
+
+  triplePrediction: () =>
+    boletoRequest<TriplePrediction>('/triple'),
+
+  latestDraw: (type: LotteryTypeId) =>
+    request<DrawResult[]>(`/${type}/draws?limit=1`).then(d => d[0] ?? null),
+
+  evPrediction: (type: LotteryTypeId, model = 'best', jackpot?: number | null) => {
+    const params = new URLSearchParams({ model })
+    if (jackpot != null && jackpot > 0) params.set('jackpot', String(jackpot))
+    return mlRequest<EVPrediction>(`/predict/${type}/ev?${params}`)
+  },
 }
 
 async function predRequest<T>(path: string, options?: RequestInit): Promise<T> {
@@ -154,6 +236,18 @@ export const predictionsApi = {
       method: 'POST',
     }),
 
+  aggregate: (lotteryType?: string, syncFirst = false) => {
+    const params = new URLSearchParams({ syncFirst: String(syncFirst) })
+    if (lotteryType) params.set('lotteryType', lotteryType)
+    return predRequest<AggregateAccuracyResult>(`/analysis/aggregate?${params}`)
+  },
+
   toggleFavorite: (id: string) =>
     predRequest<SavedPredictionSet>(`/${id}/favorite`, { method: 'PATCH' }),
+
+  feedback: (id: string) =>
+    predRequest<PredictionFeedback>(`/${id}/feedback`),
+
+  notifyTelegram: (id: string) =>
+    predRequest<void>(`/${id}/notify/telegram`, { method: 'POST' }),
 }
