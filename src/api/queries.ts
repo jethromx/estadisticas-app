@@ -365,6 +365,20 @@ export function useEVPrediction(type: LotteryTypeId, jackpot?: number | null, mo
   })
 }
 
+export function usePortfolioPrediction(
+  type: LotteryTypeId,
+  opts: { nTickets?: number; jackpot?: number | null; ticketsSold?: number; model?: string } = {},
+) {
+  const { nTickets = 5, jackpot, ticketsSold, model = 'best' } = opts
+  return useQuery({
+    queryKey: ['portfolioPrediction', type, model, nTickets, jackpot ?? 0, ticketsSold ?? 0],
+    queryFn:  () => api.portfolioPrediction(type, { nTickets, jackpot, ticketsSold, model }),
+    enabled:  !!type,
+    staleTime: 30 * 60 * 1000,
+    retry: false,
+  })
+}
+
 export function useMetaPrediction(type: LotteryTypeId, enabled = true) {
   return useQuery({
     queryKey: ['metaPrediction', type],

@@ -543,6 +543,28 @@ export interface EVPrediction {
   note:             string
 }
 
+export interface EVPortfolio {
+  lotteryType:             string
+  model:                   string
+  nTickets:                number
+  ticketPrice:             number
+  totalCost:               number
+  tickets:                 EVComboAnalysis[]
+  distinctNumbersCovered:  number
+  coveragePct:             number          // 0-1: fracción de los 56 números cubiertos
+  numbersCovered:          number[]
+  avgPopularity:           number | null
+  avgShareFactor:          number | null   // 1.0 = conservas el premio entero
+  pAnyJackpot:             number          // ≈ nTickets × pJackpot
+  edgeVsHumanPct:          number | null   // % más premio esperado que una combo humana
+  poolSize:                number
+  coverageWeight:          number
+  jackpot?:                number | null
+  totalExpectedPayout?:    number          // EV total de la cartera en MXN
+  portfolioEvRatio?:       number | null   // EV total / costo total
+  note:                    string
+}
+
 export interface TriplePrediction {
   scoredNumbers: Array<{
     number: number

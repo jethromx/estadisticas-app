@@ -11,6 +11,7 @@ import {
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { EVCard } from '@/components/EVCard'
+import { PortfolioCard } from '@/components/PortfolioCard'
 import { Button } from '@/components/ui/button'
 import { Spinner } from '@/components/ui/spinner'
 import { useNextDraw } from '@/hooks/useNextDraw'
@@ -425,6 +426,9 @@ export function Dashboard() {
 
       {/* Zona 1.5: Valor esperado (bolsa + combo EV-optimizado) */}
       <EVCard type="MELATE" />
+
+      {/* Zona 1.6: Cartera EV-óptima de N boletos */}
+      <PortfolioCard type="MELATE" />
 
       {/* Zona 2: Tus predicciones */}
       <TusPredicciones />

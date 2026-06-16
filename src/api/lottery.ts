@@ -34,6 +34,7 @@ import type {
   ImprovedPrediction,
   TriplePrediction,
   EVPrediction,
+  EVPortfolio,
 } from '@/types/lottery'
 
 const BASE        = `${import.meta.env.VITE_API_BASE_URL ?? ''}/api/v1/lottery`
@@ -196,6 +197,17 @@ export const api = {
     const params = new URLSearchParams({ model })
     if (jackpot != null && jackpot > 0) params.set('jackpot', String(jackpot))
     return mlRequest<EVPrediction>(`/predict/${type}/ev?${params}`)
+  },
+
+  portfolioPrediction: (
+    type: LotteryTypeId,
+    opts: { nTickets?: number; jackpot?: number | null; ticketsSold?: number; model?: string } = {},
+  ) => {
+    const { nTickets = 5, jackpot, ticketsSold, model = 'best' } = opts
+    const params = new URLSearchParams({ model, n_tickets: String(nTickets) })
+    if (jackpot != null && jackpot > 0) params.set('jackpot', String(jackpot))
+    if (ticketsSold != null && ticketsSold > 0) params.set('tickets_sold', String(ticketsSold))
+    return mlRequest<EVPortfolio>(`/predict/${type}/portfolio?${params}`)
   },
 }
 
